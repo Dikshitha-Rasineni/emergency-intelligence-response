@@ -9,6 +9,8 @@ Emergency Intelligence & Response is a geospatial decision-support system design
 - Dikshitha – Full Stack + GenAI + Integration
 - T. Himesh – Dataset + ML + Testing
 - S. Mourya Veer – Hardware + IoT
+- CHINNI VENKATA NAGA SAI BHAVYA - UI/UX + Frontend 
+
 
 ## Technology Stack
 
