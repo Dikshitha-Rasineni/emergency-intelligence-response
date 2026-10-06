@@ -51,3 +51,8 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.temp
+
+# Local GenAI model files
+genai/models/*.gguf
+multilingual/.venv310/
+multilingual/.venv/

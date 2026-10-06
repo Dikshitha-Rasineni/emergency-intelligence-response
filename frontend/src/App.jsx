@@ -1,32 +1,35 @@
-import { useEffect, useState } from "react";
-import { checkBackendHealth } from "./services/api";
+import { Routes, Route } from 'react-router-dom'
+import AppShell from './components/layout/AppShell'
+import CommandCenter from './pages/CommandCenter'
+import Pending from './pages/Pending'
+import EmergencyReport from './pages/EmergencyReport'
+import ActiveIncidents from './pages/ActiveIncidents'
+import IncidentDetails from './pages/IncidentDetails'
 
-function App() {
-  const [backendStatus, setBackendStatus] = useState("Checking...");
+/* Routes only. Screens live in pages/, layout in components/layout/. */
+const later = [
+  ['resources', 'Resource intelligence', '/api/resources/nearby'],
+  ['map', 'Emergency map', '/api/dashboard/resources'],
+  ['intelligence', 'Response intelligence', '/api/ai/response'],
+  ['sensors', 'Sensor monitoring', '/api/iot/events'],
+  ['analytics', 'Analytics', '/api/dashboard/analytics'],
+  ['history', 'Incident history', '/api/incidents'],
+  ['admin', 'Users', null],
+  ['settings', 'Settings', null],
+]
 
-  useEffect(() => {
-    const checkConnection = async () => {
-      try {
-        const data = await checkBackendHealth();
-        setBackendStatus(data.status);
-      } catch (error) {
-        console.error("Backend connection failed:", error);
-        setBackendStatus("Backend unavailable");
-      }
-    };
-
-    checkConnection();
-  }, []);
-
+export default function App() {
   return (
-    <div>
-      <h1>Emergency Intelligence & Response</h1>
-
-      <p>
-        Backend status: <strong>{backendStatus}</strong>
-      </p>
-    </div>
-  );
+    <Routes>
+      <Route element={<AppShell />}>
+        <Route index element={<CommandCenter />} />
+        <Route path="report" element={<EmergencyReport />} />
+        <Route path="incidents" element={<ActiveIncidents />} />
+        <Route path="incidents/:id" element={<IncidentDetails />} />
+        {later.map(([path, title, endpoint]) => (
+          <Route key={path} path={path} element={<Pending title={title} endpoint={endpoint} />} />
+        ))}
+      </Route>
+    </Routes>
+  )
 }
-
-export default App;
