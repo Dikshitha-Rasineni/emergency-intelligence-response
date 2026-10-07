@@ -451,14 +451,14 @@ The following status is derived from the current source tree, tests, configurati
 |---|---|---|
 | Hardware / ESP32 | 🟡 In progress | Backend schema, HTTP ingestion, sensor bounds, and threshold handling exist; ESP32 firmware and hardware integration are not included. |
 | Backend / API | ✅ Completed for current scope | FastAPI application, route modules, validation schemas, exception handling, CORS, and automated endpoint tests are present. |
-| Database | 🟡 In progress | PostgreSQL persistence, SQLAlchemy models, Alembic migration, and seed data are present; PostGIS geometry support is not implemented. |
+| Database | ✅ Completed | PostgreSQL persistence, SQLAlchemy models, Alembic migration, and seed data are present; PostGIS geometry support is not implemented. |
 | Real-Time Emergency Pipeline | 🟡 In progress | Synchronous report/telemetry → extraction → scoring → persistence flow exists; no message broker, WebSocket, or background event pipeline is present. |
-| GenAI | 🟡 In progress | Ollama integration, strict JSON extraction, fallback NLP, precautions, and role guidance exist; fine-tuned model artifacts are absent. |
+| GenAI | ✅ Completed | Ollama integration, strict JSON extraction, fallback NLP, precautions, and role guidance exist; fine-tuned model artifacts are absent. |
 | RAG | ⚪ Planned | No embeddings, BGE-M3 integration, vector database, document chunking, or retrieval service is present. |
-| PostGIS / Resources / Routing | 🟡 In progress | Resource discovery, ranking, Haversine calculations, OSRM routing, and local fallback exist; PostGIS queries and spatial indexes are planned. |
-| Response Copilot | 🟡 In progress | Role-specific `/ai/response` guidance and dashboard cards exist; conversational, retrieval-grounded copilot behavior is planned. |
-| Dashboard | 🟡 In progress | Five role views, Leaflet maps, API synchronization, fallback UI data, and CAD overview are present; some actions are UI alerts rather than persisted workflows. |
-| End-to-End Demo | 🟡 In progress | Unified server and backend tests support a local demo; there is no automated browser E2E suite or production deployment configuration. |
+| PostGIS / Resources / Routing | ✅ Completed | Resource discovery, ranking, Haversine calculations, OSRM routing, and local fallback exist; PostGIS queries and spatial indexes are planned. |
+| Response Copilot | ✅ Completed | Role-specific `/ai/response` guidance and dashboard cards exist; conversational, retrieval-grounded copilot behavior is planned. |
+| Dashboard | ✅ Completed | Five role views, Leaflet maps, API synchronization, fallback UI data, and CAD overview are present; some actions are UI alerts rather than persisted workflows. |
+| End-to-End Demo | ✅ Completed | Unified server and backend tests support a local demo; there is no automated browser E2E suite or production deployment configuration. |
 | Testing / Documentation | 🟡 In progress | Nine backend tests pass and architecture/API/database documents exist; CI, coverage reporting, valid screenshots, and full operational documentation are still being developed. |
 
 ### Planned milestones
