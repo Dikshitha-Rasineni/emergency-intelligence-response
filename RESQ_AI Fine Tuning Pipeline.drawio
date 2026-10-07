@@ -1,0 +1,178 @@
+<mxfile host="app.diagrams.net" agent="ChatGPT">
+  <diagram id="resq-ai-finetune-final" name="RESQ.AI Fine-Tuning Pipeline">
+    <mxGraphModel dx="1613" dy="969" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1000" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" parent="1" style="text;html=1;strokeColor=none;fillColor=none;fontColor=#c95b00;fontSize=28;fontStyle=1;align=center;verticalAlign=middle;" value="Generated Content &amp; Fine-Tuning Pipeline" vertex="1">
+          <mxGeometry height="55" width="1560" x="20" y="20" as="geometry" />
+        </mxCell>
+        <mxCell id="P1" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d9eaf7;strokeColor=#78aeda;strokeWidth=2;fontSize=14;fontStyle=1;align=center;verticalAlign=top;spacingTop=10;" value="1. OBJECTIVES" vertex="1">
+          <mxGeometry height="710" width="285" x="20" y="95" as="geometry" />
+        </mxCell>
+        <mxCell id="P2" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dcefd5;strokeColor=#76ad68;strokeWidth=2;fontSize=14;fontStyle=1;align=center;verticalAlign=top;spacingTop=10;" value="2. DATA PREPARATION" vertex="1">
+          <mxGeometry height="710" width="285" x="325" y="95" as="geometry" />
+        </mxCell>
+        <mxCell id="P3" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e6d9f0;strokeColor=#9a7abb;strokeWidth=2;fontSize=14;fontStyle=1;align=center;verticalAlign=top;spacingTop=10;" value="3. MODEL TRAINING / FINE-TUNING" vertex="1">
+          <mxGeometry height="710" width="285" x="630" y="95" as="geometry" />
+        </mxCell>
+        <mxCell id="P4" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f6d1d1;strokeColor=#d85b5b;strokeWidth=2;fontSize=14;fontStyle=1;align=center;verticalAlign=top;spacingTop=10;" value="4. VALIDATION &amp; INTEGRATION" vertex="1">
+          <mxGeometry height="710" width="285" x="935" y="95" as="geometry" />
+        </mxCell>
+        <mxCell id="P5" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d6ebe7;strokeColor=#6caea3;strokeWidth=2;fontSize=14;fontStyle=1;align=center;verticalAlign=top;spacingTop=10;" value="5. GENERATED CONTENT &amp; APPLICATION" vertex="1">
+          <mxGeometry height="710" width="340" x="1240" y="95" as="geometry" />
+        </mxCell>
+        <mxCell id="o1" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dcefd5;strokeColor=#666666;strokeWidth=1;fontSize=10;align=left;verticalAlign=top;spacing=7;" value="Objective 1: Emergency Understanding  NLP/GenAI extraction of emergency type, affected people, injuries and location." vertex="1">
+          <mxGeometry height="105" width="255" x="35" y="140" as="geometry" />
+        </mxCell>
+        <mxCell id="o2" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f6d1d1;strokeColor=#666666;strokeWidth=1;fontSize=10;align=left;verticalAlign=top;spacing=7;" value="Objective 2: Faster Situational Awareness  Missing information detection and urgency identification." vertex="1">
+          <mxGeometry height="105" width="255" x="35" y="255" as="geometry" />
+        </mxCell>
+        <mxCell id="o3" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d9eaf7;strokeColor=#666666;strokeWidth=1;fontSize=10;align=left;verticalAlign=top;spacing=7;" value="Objective 3: Intelligent Response Support  Safety precautions, reporter guidance, response recommendations and incident reports." vertex="1">
+          <mxGeometry height="125" width="255" x="35" y="370" as="geometry" />
+        </mxCell>
+        <mxCell id="o4" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f4dfb8;strokeColor=#666666;strokeWidth=1;fontSize=10;align=left;verticalAlign=top;spacing=7;" value="Objective 4: Resource Intelligence  Nearby hospitals, ambulances, police, fire stations and shelters." vertex="1">
+          <mxGeometry height="105" width="255" x="35" y="505" as="geometry" />
+        </mxCell>
+        <mxCell id="o5" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e6d9f0;strokeColor=#666666;strokeWidth=1;fontSize=10;align=left;verticalAlign=top;spacing=7;" value="Objective 5: Multilingual Accessibility  Translation and localized emergency communication." vertex="1">
+          <mxGeometry height="105" width="255" x="35" y="620" as="geometry" />
+        </mxCell>
+        <mxCell id="d1" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#666666;strokeWidth=1;fontSize=11;align=left;verticalAlign=middle;spacing=7;" value="Emergency Data Sources  • User emergency reports • ESP32 / sensor events • GPS / location data • Optional images / context" vertex="1">
+          <mxGeometry height="125" width="255" x="340" y="140" as="geometry" />
+        </mxCell>
+        <mxCell id="d2" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#666666;strokeWidth=1;fontSize=11;align=left;verticalAlign=middle;spacing=7;" value="Dataset Construction  • Cleaning &amp; normalization • Deduplication • Annotation / labels • Multilingual samples • Train / validation / test split" vertex="1">
+          <mxGeometry height="145" width="255" x="340" y="285" as="geometry" />
+        </mxCell>
+        <mxCell id="d3" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#666666;strokeWidth=1;fontSize=11;align=left;verticalAlign=middle;spacing=7;" value="Instruction Dataset  • Emergency understanding • Missing-information detection • Safety guidance • Response recommendations • Incident-report generation • Multilingual examples" vertex="1">
+          <mxGeometry height="165" width="255" x="340" y="450" as="geometry" />
+        </mxCell>
+        <mxCell id="d4" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#666666;strokeWidth=1;fontSize=11;align=left;verticalAlign=middle;spacing=7;" value="Schema &amp; Quality Checks  • Structured JSON schema • Input-output consistency • Grounded fields • Dataset validation" vertex="1">
+          <mxGeometry height="105" width="255" x="340" y="635" as="geometry" />
+        </mxCell>
+        <mxCell id="t1" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#666666;strokeWidth=1;fontSize=11;align=left;verticalAlign=middle;spacing=7;" value="Base Model  Qwen2.5-3B-Instruct GGUF / Q4_K_M  Pretrained transformer LLM" vertex="1">
+          <mxGeometry height="125" width="255" x="645" y="140" as="geometry" />
+        </mxCell>
+        <mxCell id="t2" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#666666;strokeWidth=1;fontSize=11;align=left;verticalAlign=middle;spacing=7;" value="Fine-Tuning Method  • Supervised Fine-Tuning (SFT) • Parameter-Efficient Fine-Tuning (PEFT) • LoRA / QLoRA • Emergency-domain adaptation" vertex="1">
+          <mxGeometry height="150" width="255" x="645" y="285" as="geometry" />
+        </mxCell>
+        <mxCell id="t3" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#666666;strokeWidth=1;fontSize=11;align=left;verticalAlign=middle;spacing=7;" value="Training Process  • Tokenization • Batches / epochs • Learning rate • Checkpoint saving • Train / validation monitoring" vertex="1">
+          <mxGeometry height="140" width="255" x="645" y="455" as="geometry" />
+        </mxCell>
+        <mxCell id="t4" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#666666;strokeWidth=1;fontSize=11;align=left;verticalAlign=middle;spacing=7;" value="Fine-Tuned Emergency Model  • Emergency understanding • Structured extraction • Safety / response generation • Multilingual support" vertex="1">
+          <mxGeometry height="125" width="255" x="645" y="615" as="geometry" />
+        </mxCell>
+        <mxCell id="v1" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#666666;strokeWidth=1;fontSize=11;align=left;verticalAlign=middle;spacing=7;" value="Validation Metrics  • Extraction accuracy • JSON validity rate • Missing-information detection • Response quality • Multilingual performance" vertex="1">
+          <mxGeometry height="140" width="255" x="950" y="140" as="geometry" />
+        </mxCell>
+        <mxCell id="v2" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#666666;strokeWidth=1;fontSize=11;align=left;verticalAlign=middle;spacing=7;" value="Safety &amp; Reliability Checks  • Hallucination checks • Grounding verification • Safety / compliance checks • Human review samples • Compare with base model" vertex="1">
+          <mxGeometry height="155" width="255" x="950" y="300" as="geometry" />
+        </mxCell>
+        <mxCell id="v3" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#666666;strokeWidth=1;fontSize=11;align=left;verticalAlign=middle;spacing=7;" value="Model Selection &amp; Versioning  • Select best checkpoint • Store evaluation results • Maintain model version • Document performance" vertex="1">
+          <mxGeometry height="125" width="255" x="950" y="475" as="geometry" />
+        </mxCell>
+        <mxCell id="v4" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#666666;strokeWidth=1;fontSize=11;align=left;verticalAlign=middle;spacing=7;" value="Deployment / Integration  • llama.cpp inference service • FastAPI AI endpoint • Secure internal access • Connect to RESQ.AI pipeline" vertex="1">
+          <mxGeometry height="120" width="255" x="950" y="620" as="geometry" />
+        </mxCell>
+        <mxCell id="q1" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#666666;strokeWidth=1;fontSize=11;align=left;verticalAlign=middle;spacing=7;" value="Generated Outputs  • Structured incident JSON • Missing-information list • Safety precautions • Reporter guidance • Response recommendations • Multilingual responses" vertex="1">
+          <mxGeometry height="160" width="310" x="1255" y="140" as="geometry" />
+        </mxCell>
+        <mxCell id="q2" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#666666;strokeWidth=1;fontSize=11;align=left;verticalAlign=middle;spacing=7;" value="RESQ.AI Application  • User dashboard • Hospital / Police / Fire dashboards • Alerts &amp; notifications • Resource mapping &amp; routing • Incident report generation" vertex="1">
+          <mxGeometry height="155" width="310" x="1255" y="330" as="geometry" />
+        </mxCell>
+        <mxCell id="q3" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#666666;strokeWidth=1;fontSize=11;align=left;verticalAlign=middle;spacing=7;" value="Operational Result  • Faster situational awareness • Accurate structured information • Context-aware guidance • Human-verified response support" vertex="1">
+          <mxGeometry height="135" width="310" x="1255" y="515" as="geometry" />
+        </mxCell>
+        <mxCell id="q4" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#666666;strokeWidth=1;fontSize=11;align=left;verticalAlign=middle;spacing=7;" value="Real-Time Emergency Response Support  Integrated into the end-to-end RESQ.AI pipeline." vertex="1">
+          <mxGeometry height="80" width="310" x="1255" y="680" as="geometry" />
+        </mxCell>
+        <mxCell id="m1" edge="1" parent="1" source="d1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;endArrow=block;" target="t1" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="m2" edge="1" parent="1" source="t1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;endArrow=block;" target="v1" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="m3" edge="1" parent="1" source="v1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;endArrow=block;" target="q1" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="flow_d1d2" edge="1" parent="1" source="d1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;endArrow=block;" target="d2" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="flow_d2d3" edge="1" parent="1" source="d2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;endArrow=block;" target="d3" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="flow_d3d4" edge="1" parent="1" source="d3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;endArrow=block;" target="d4" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="flow_t1t2" edge="1" parent="1" source="t1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;endArrow=block;" target="t2" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="flow_t2t3" edge="1" parent="1" source="t2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;endArrow=block;" target="t3" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="flow_t3t4" edge="1" parent="1" source="t3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;endArrow=block;" target="t4" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="flow_v1v2" edge="1" parent="1" source="v1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;endArrow=block;" target="v2" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="flow_v2v3" edge="1" parent="1" source="v2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;endArrow=block;" target="v3" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="flow_v3v4" edge="1" parent="1" source="v3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;endArrow=block;" target="v4" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="flow_q1q2" edge="1" parent="1" source="q1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;endArrow=block;" target="q2" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="flow_q2q3" edge="1" parent="1" source="q2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;endArrow=block;" target="q3" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="flow_q3q4" edge="1" parent="1" source="q3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;endArrow=block;" target="q4" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="map0" edge="1" parent="1" source="o1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=1;dashed=1;dashPattern=4 4;strokeColor=#555555;endArrow=block;" target="d3" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="map1" edge="1" parent="1" source="o2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=1;dashed=1;dashPattern=4 4;strokeColor=#555555;endArrow=block;" target="d3" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="map2" edge="1" parent="1" source="o3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=1;dashed=1;dashPattern=4 4;strokeColor=#555555;endArrow=block;" target="q1" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="map3" edge="1" parent="1" source="o4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=1;dashed=1;dashPattern=4 4;strokeColor=#555555;endArrow=block;" target="q2" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="map4" edge="1" parent="1" source="o5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=1;dashed=1;dashPattern=4 4;strokeColor=#555555;endArrow=block;" target="d3" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="deploy" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#a9d77f;strokeColor=#79ad55;strokeWidth=2;fontSize=16;fontStyle=1;align=center;verticalAlign=middle;" value="DEPLOYED INFERENCE IN RESQ.AI SYSTEM" vertex="1">
+          <mxGeometry height="50" width="1255" x="325" y="830" as="geometry" />
+        </mxCell>
+        <mxCell id="b1" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#666666;strokeWidth=1;fontSize=11;align=left;verticalAlign=middle;spacing=7;" value="Emergency Understanding NLP / GenAI extraction Emergency type • people • injuries • location" vertex="1">
+          <mxGeometry height="70" width="290" x="340" y="895" as="geometry" />
+        </mxCell>
+        <mxCell id="b2" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#666666;strokeWidth=1;fontSize=11;align=left;verticalAlign=middle;spacing=7;" value="Multilingual Support Translation &amp; localisation Multiple emergency languages" vertex="1">
+          <mxGeometry height="70" width="290" x="655" y="895" as="geometry" />
+        </mxCell>
+        <mxCell id="b3" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#666666;strokeWidth=1;fontSize=11;align=left;verticalAlign=middle;spacing=7;" value="Safety &amp; Response Generation Precautions • recommendations Context-aware guidance" vertex="1">
+          <mxGeometry height="70" width="290" x="970" y="895" as="geometry" />
+        </mxCell>
+        <mxCell id="b4" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#666666;strokeWidth=1;fontSize=11;align=left;verticalAlign=middle;spacing=7;" value="Integrated Emergency Response End-to-end pipeline Web / mobile dashboards" vertex="1">
+          <mxGeometry height="70" width="290" x="1285" y="895" as="geometry" />
+        </mxCell>
+        <mxCell id="down0" edge="1" parent="1" source="d4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;endArrow=block;" target="b1" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="down1" edge="1" parent="1" source="t4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;endArrow=block;" target="b2" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="down2" edge="1" parent="1" source="v4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;endArrow=block;" target="b3" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="down3" edge="1" parent="1" source="q4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;endArrow=block;" target="b4" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
