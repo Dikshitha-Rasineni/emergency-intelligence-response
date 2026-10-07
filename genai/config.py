@@ -1,5 +1,0 @@
-MODEL_NAME = "Qwen/Qwen2.5-7B-Instruct"
-
-MAX_NEW_TOKENS = 400
-
-TEMPERATURE = 0.1
