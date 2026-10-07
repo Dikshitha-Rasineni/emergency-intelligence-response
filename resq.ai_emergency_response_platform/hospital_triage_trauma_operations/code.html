@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RESQ.AI — Hospital Trauma & Triage Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+  <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+  <header class="top-header">
+    <div class="top-header-inner">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div style="background:#dc2626;color:#ffffff;border-radius:var(--radius-sm);width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;">+</div>
+        <div>
+          <div style="font-weight:700;font-size:16px;letter-spacing:-0.02em;line-height:1.1;color:#0f172a;">RESQ.AI</div>
+          <div style="font-size:10px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;">Hospital Triage Portal</div>
+        </div>
+      </div>
+      <nav class="role-nav" aria-label="Portal Navigation">
+        <button class="role-btn" data-role="USER" onclick="switchRole('USER')">Citizen Portal</button>
+        <button class="role-btn active" data-role="HOSPITAL" onclick="switchRole('HOSPITAL')">Hospital Triage</button>
+        <button class="role-btn" data-role="POLICE" onclick="switchRole('POLICE')">Police Operations</button>
+        <button class="role-btn" data-role="FIRE" onclick="switchRole('FIRE')">Fire & Rescue</button>
+        <button class="role-btn" data-role="ADMIN" onclick="switchRole('ADMIN')">Admin CAD</button>
+      </nav>
+      <div style="display:flex;align-items:center;gap:12px;">
+        <span id="backendApiBadge" class="badge badge-warning mono">
+          <span style="width:6px;height:6px;border-radius:50%;background:#d97706;display:inline-block;"></span> LOCAL ENGINE
+        </span>
+        <a href="tel:112" class="badge badge-emergency mono" style="text-decoration:none;font-size:12px;padding:4px 8px;">SOS 112</a>
+        <div style="width:28px;height:28px;border-radius:50%;background:#e2e8f0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:#334155;">HOSP</div>
+      </div>
+    </div>
+  </header>
+
+  <main class="container-max" id="mainAppView"></main>
+
+  <script>window.location.hash = "#hospital";</script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script src="../app.js"></script>
+</body>
+</html>
