@@ -10,6 +10,7 @@ RESQ.AI is an **Emergency Intelligence & Response Support System**. It converts 
 
 ## Contents
 
+- [Documentation deep dives](#documentation-deep-dives)
 - [Project scope](#project-scope)
 - [What is implemented](#what-is-implemented)
 - [System architecture](#system-architecture)
@@ -31,6 +32,14 @@ RESQ.AI is an **Emergency Intelligence & Response Support System**. It converts 
 - [Limitations and planned work](#limitations-and-planned-work)
 - [Safety and data considerations](#safety-and-data-considerations)
 
+## Documentation deep dives
+
+- 📘 **[Comprehensive Architecture Guide](emergency-intelligence-response-main/docs/ARCHITECTURE.md)** — Multi-layer system topology, Amazon Location Service integration, edge hardware specs, mathematical ranking formulas, and component responsibilities.
+- 🔄 **[End-to-End Operational Workflows](emergency-intelligence-response-main/docs/WORKFLOW.md)** — Sequence diagrams for citizen intake, automated IoT ingestion, hybrid AI processing, multi-agency dispatch, and fault-tolerance fallbacks.
+- 📋 **[API Contract & Specifications](emergency-intelligence-response-main/docs/API_CONTRACT.md)** — Complete OpenAPI REST endpoints and Pydantic schemas.
+- 🗄️ **[Relational Database Schema](emergency-intelligence-response-main/docs/DATABASE_SCHEMA.md)** — 9-table PostgreSQL 17 relational schema and Alembic migrations.
+- ⚡ **[ESP32 IoT Firmware Guide](emergency-intelligence-response-main/iot/README.md)** — Embedded C++ firmware, sensor calibration, pin mappings, and non-volatile flash queue buffer.
+
 ## Project scope
 
 The repository contains two cooperating applications:
@@ -48,29 +57,31 @@ The current implementation is centered on emergency reports in a Bengaluru-area 
 - PostgreSQL persistence through SQLAlchemy and an Alembic migration covering nine relational tables.
 - Seeded emergency resources, availability records, responder nodes, users, and baseline incidents.
 - Nearby-resource discovery using latitude/longitude distance calculations and road-distance estimates.
-- Multi-factor resource ranking using proximity, availability/capacity, and emergency-type suitability.
-- Routing through the public OSRM road-routing service with a deterministic local fallback when OSRM is unreachable.
-- ESP32-oriented HTTP telemetry ingestion for impact, smoke, water-level, and temperature signals.
-- Threshold-triggered incident creation for accident, fire, and flood telemetry.
+- Multi-factor resource ranking using proximity (40%), availability/capacity (30%), and emergency-type suitability (30%).
+- **Amazon Location Service routing (`geo:CalculateRoute`)** with automatic secondary fallback to OSRM and tertiary local Haversine tortuosity model.
+- **Amazon Location Service Map Proxy** serving vector tiles (`/tiles/{z}/{x}/{y}`), style descriptors (`/style.json`), glyphs, and sprites using backend IAM credentials.
+- **ESP32 C++ firmware (`iot/`)** for DevKit V1 supporting MPU-6050, DHT22, MQ-2, FSR, Sound, SIM800L, and non-volatile flash memory (`Preferences` / NVS) offline queuing.
+- Threshold-triggered automated incident synthesis for accident, fire, and flood telemetry.
 - Hybrid AI decision support: optional Ollama JSON extraction plus deterministic keyword/regex fallback; non-diagnostic precautions; hospital, police, and fire response guidance.
-- Five UI modes: citizen, hospital, police, fire, and admin/CAD.
-- Leaflet map rendering, OpenStreetMap tiles, OSRM route geometry, resource markers, route summaries, and local fallback resource data.
-- Automated backend tests covering health, incidents, persistence, resources, ranking, routing, precautions, role intelligence, and IoT ingestion.
+- Five UI modes: citizen, hospital, police, fire, and admin/CAD with live MapLibre/Leaflet maps and route visualization.
+- Comprehensive automated test suites: backend core tests (`test_backend.py`) and Amazon Location integration tests (`test_amazon_location.py`).
 
 ## System architecture
 
 ```mermaid
 flowchart LR
-    citizen["Citizen web report"] --> api["FastAPI API"]
-    sensor["ESP32 telemetry"] --> api
+    citizen["Citizen web report"] --> api["FastAPI Core API"]
+    sensor["ESP32 IoT Node (MPU6050/DHT/MQ2)"] --> api
     api --> validate["Pydantic validation"]
     validate --> understand["Ollama LLM or deterministic fallback"]
-    understand --> priority["Explainable priority and severity rules"]
-    priority --> db["PostgreSQL via SQLAlchemy"]
-    db --> resources["Nearby resources and availability"]
-    resources --> ranking["Multi-factor ranking"]
-    ranking --> routing["OSRM route or local GIS fallback"]
+    understand --> priority["Explainable priority and severity rules (0-100)"]
+    priority --> db["PostgreSQL 17 via SQLAlchemy"]
+    db --> resources["Nearby resources & availability"]
+    resources --> ranking["Multi-factor ranking (40/30/30)"]
+    ranking --> routing["Amazon Location Routes / OSRM fallback"]
     routing --> ui["Role-based operational UI"]
+    api --> mapservice["Amazon Location Map Tile Proxy"]
+    mapservice --> ui
     understand --> guidance["Precautions and role guidance"]
     guidance --> ui
     ui --> human["Authorized responder verification"]
@@ -87,6 +98,8 @@ flowchart LR
 7. The UI presents verified data separately from AI assessment and operational recommendations.
 
 ## Operational workflows
+
+> 💡 *For complete sequence diagrams, state transition models, edge IoT buffering, and failure handling procedures, see the comprehensive **[End-to-End Operational Workflows Guide](emergency-intelligence-response-main/docs/WORKFLOW.md)**.*
 
 ### Citizen portal — `/#user`
 
@@ -122,15 +135,15 @@ The UI includes fallback display data so that the interface can still be explore
 
 | Area | Current implementation | Status note |
 |---|---|---|
-| Language | Python, JavaScript, HTML, CSS | Implemented |
+| Language | Python 3.10+, JavaScript (ES6+), C++ (PlatformIO / Arduino), HTML5, CSS3 | Implemented |
 | API | FastAPI, Uvicorn, Pydantic v2 | Implemented |
-| Persistence | PostgreSQL, SQLAlchemy, psycopg | Implemented |
+| Persistence | PostgreSQL 17, SQLAlchemy 2.x, psycopg | Implemented |
 | Migrations | Alembic | Implemented |
 | AI runtime | Ollama HTTP API; configurable model; deterministic fallback parser | Implemented in hybrid form |
 | NLP | Prompt-based extraction plus keyword/regex fallback | Implemented |
-| Maps | Leaflet 1.9.4, OpenStreetMap tiles | Implemented in the UI |
-| Routing | OSRM HTTP service with local Haversine/tortuosity fallback | Implemented |
-| IoT transport | HTTP endpoint for ESP32-style telemetry | Implemented; firmware is not included |
+| Maps | Amazon Location Service Vector Tiles, MapLibre styles, Leaflet 1.9.4, OpenStreetMap tiles | Implemented in backend & UI |
+| Routing | Amazon Location Routes (`geo:CalculateRoute`), OSRM HTTP service, local Haversine/tortuosity fallback | Implemented |
+| IoT transport & Firmware | ESP32 C++ firmware (MPU-6050, DHT22, MQ-2, FSR, Sound, SIM800L, NVS Flash Queue) & FastAPI HTTP telemetry | Implemented |
 | PostGIS | Described in design documents but not used by current models or queries | Planned |
 | Embeddings/RAG | No embedding model, vector store, or retrieval pipeline in the current source tree | Planned |
 | Frontend framework | Vanilla JavaScript; no React build is present in the current project | Implemented |
@@ -498,23 +511,28 @@ These areas describe repository structure, not confirmed individual authorship. 
 
 ## Testing and validation
 
-Run the backend test suite from the backend project root:
+Run the backend test suites from the backend project root:
 
 ```bash
 cd emergency-intelligence-response-main
+
+# Run core backend and API tests
 python -m pytest testing/test_backend.py -v
+
+# Run Amazon Location Service integration tests
+python -m pytest testing/test_amazon_location.py -v
 ```
 
-The checked-in suite covers:
+The checked-in test suites cover:
 
 - Health and database connectivity.
 - Incident creation and persistence of AI extraction and severity assessment.
 - Incident listing and retrieval.
 - Nearby-resource discovery and ETA calculation.
-- Multi-factor resource ranking.
-- OSRM/local-fallback route calculation.
-- Non-diagnostic precautions.
-- Hospital role intelligence.
+- Multi-factor resource ranking (proximity, capacity, type match).
+- Amazon Location Service routing and OSRM/local-fallback calculation.
+- Map tile and style proxy endpoint response handling.
+- Non-diagnostic precautions and hospital/police/fire role intelligence.
 - IoT event ingestion and threshold-triggered incident creation.
 
 Additional syntax checks used during repository validation:
@@ -534,32 +552,34 @@ The repository currently has no CI workflow, coverage threshold, automated brows
 
 - **No authentication or authorization:** the API does not currently enforce user identity or responder roles.
 - **No production dispatch integration:** UI acknowledgement and dispatch-style actions are not a replacement for official CAD or emergency-service dispatch systems.
-- **No firmware:** the repository defines the HTTP contract for ESP32-style readings but contains no embedded firmware, device credentials, retry queue, or broker integration.
+- **Hardware calibration & deployment:** ESP32 C++ firmware with non-volatile flash buffering is provided in `emergency-intelligence-response-main/iot/`; field installations require analog ADC calibration against real smoke/gas levels.
 - **No RAG or embeddings:** responses are generated from prompt logic, deterministic templates, and the local fallback parser; they are not grounded against an indexed policy corpus.
 - **No fine-tuned model:** the checked-in drawio diagram describes a Qwen2.5-3B-Instruct/LoRA-style direction, but no training script, weights, evaluation set, or fine-tuning run is present.
-- **No PostGIS implementation:** current geospatial logic uses scalar coordinates, Haversine distance, multipliers, and OSRM HTTP results.
-- **External routing and map assets:** OSRM, OpenStreetMap tiles, Leaflet CDN assets, and Google Fonts require network access; routing has a backend fallback, but map tiles do not.
+- **No PostGIS implementation:** current geospatial logic uses scalar coordinates, Haversine distance, multipliers, and Amazon Location / OSRM HTTP results.
+- **External routing and map assets:** Amazon Location Service, OSRM, and Leaflet CDN assets require network access; routing has a multi-tier fallback (AWS → OSRM → Haversine), but offline vector tiles require local caching.
 - **Demonstration thresholds and seed data:** sensor thresholds, locations, capabilities, and response templates require operational validation before real use.
 - **Limited persistence for UI actions:** some UI interactions show alerts or update local state rather than writing a responder audit event to the database.
-- **No valid screenshot gallery:** existing `screen.png` files are failed-fetch placeholders and are intentionally not presented as screenshots.
 
 ## Safety and data considerations
 
 - Do not use generated precautions or recommendations as medical diagnosis, legal advice, or an autonomous dispatch decision.
 - Verify incident coordinates, casualty counts, sensor readings, resource availability, and route conditions with authorized personnel.
-- Keep `.env` files, database credentials, Ollama access details, and any personally identifiable information out of commits.
+- Keep `.env` files, database credentials, Ollama access details, AWS access keys, and any personally identifiable information out of commits.
 - Review and calibrate all sensor thresholds and operational templates with qualified emergency-response stakeholders.
 - Treat public OSRM/OpenStreetMap services as development/demo dependencies and review their usage policies before deployment.
 
 ## Additional documentation
 
-- [Backend project notes](emergency-intelligence-response-main/README.md)
-- [Architecture and operational design](emergency-intelligence-response-main/docs/ARCHITECTURE.md)
+- [Comprehensive architecture and engineering design](emergency-intelligence-response-main/docs/ARCHITECTURE.md)
+- [End-to-end operational workflows](emergency-intelligence-response-main/docs/WORKFLOW.md)
 - [API contract](emergency-intelligence-response-main/docs/API_CONTRACT.md)
 - [Database schema](emergency-intelligence-response-main/docs/DATABASE_SCHEMA.md)
+- [ESP32 IoT firmware guide](emergency-intelligence-response-main/iot/README.md)
+- [Backend project notes](emergency-intelligence-response-main/README.md)
 - [Backend environment template](emergency-intelligence-response-main/backend/.env.example)
 - [Backend dependencies](emergency-intelligence-response-main/backend/requirements.txt)
-- [Backend tests](emergency-intelligence-response-main/testing/test_backend.py)
+- [Backend core tests](emergency-intelligence-response-main/testing/test_backend.py)
+- [Amazon Location tests](emergency-intelligence-response-main/testing/test_amazon_location.py)
 - [Operational UI notes](resq.ai_emergency_response_platform/README.md)
 - [Fine-tuning pipeline design artifact](RESQ_AI%20Fine%20Tuning%20Pipeline.drawio)
 

@@ -6,37 +6,44 @@ RESQ.AI transforms unstructured emergency signals from citizens and IoT sensor s
 
 ---
 
+## Technical Documentation
+
+- **[System Architecture (`docs/ARCHITECTURE.md`)](file:///c:/Users/moury/Coding/Projects/GENAI-Project/emergency-intelligence-response-main/docs/ARCHITECTURE.md)**: Deep dive into the multi-layer system architecture, Amazon Location Service integration, and mathematical scoring models.
+- **[Operational Workflows (`docs/WORKFLOW.md`)](file:///c:/Users/moury/Coding/Projects/GENAI-Project/emergency-intelligence-response-main/docs/WORKFLOW.md)**: Sequence diagrams and step-by-step procedures for citizen reporting, IoT event synthesis, failover resilience, and CAD verification.
+- **[API Contract (`docs/API_CONTRACT.md`)](file:///c:/Users/moury/Coding/Projects/GENAI-Project/emergency-intelligence-response-main/docs/API_CONTRACT.md)**: Complete OpenAPI specification covering all canonical `/api/v1` endpoints and request/response payloads.
+- **[Database Schema (`docs/DATABASE_SCHEMA.md`)](file:///c:/Users/moury/Coding/Projects/GENAI-Project/emergency-intelligence-response-main/docs/DATABASE_SCHEMA.md)**: PostgreSQL 17 relational schema, foreign key relations, and Alembic migration details.
+
+---
+
 ## Architecture Overview
 
 ```
                       RESQ.AI Architecture
                       
- Citizen Web Portal                ESP32 IoT Gateway
-         │                                 │
-         └───────────────┬─────────────────┘
-                         ▼
-             FastAPI Canonical REST API
-             (/api/v1/... + /api/...)
-                         │
-             ┌───────────┴───────────┐
-             ▼                       ▼
-    Validation Layer        AI Extraction & Reasoning
-             │              (Ollama Qwen/Llama + Fallback)
-             ▼                       │
-    Priority & Severity              │
-      Scoring Engine                 │
-             │                       │
-             ▼                       ▼
-     PostgreSQL 17 DB        Response Recommendations
-   (Alembic 9-Table Schema)    (Non-Diagnostic Guidance)
-             │                       │
-             ▼                       ▼
-   Geospatial Discovery       GIS Routing & ETA
-   & Multi-Factor Ranking    (Road-Tortuosity Matrix)
-             │                       │
-             └───────────┬───────────┘
-                         ▼
-        Role-Specific Operational Dashboards
+ Citizen Web Portal                ESP32 IoT Edge Node
+         │                         (MPU6050, DHT22, MQ2, FSR, SIM800L)
+         │                                   │
+         └─────────────────┬─────────────────┘
+                           ▼
+               FastAPI Canonical REST API
+             (/api/v1/... + Map Tile Proxy)
+                           │
+         ┌─────────────────┼─────────────────┐
+         ▼                 ▼                 ▼
+  Validation Layer  AI Extraction & NLP  Amazon Location Service
+         │          (Ollama + Fallback)  (Routes + Vector Maps)
+         ▼                 │                 │
+Priority & Severity        │                 │
+  Scoring Engine           │                 │
+         │                 │                 │
+         ▼                 ▼                 ▼
+ PostgreSQL 17 DB   Response Directives  GIS Routing & ETA
+(9-Table Relational (Clinical/Tactical   (Amazon Location
+      Schema)           Safety)            + OSRM Fallback)
+         │                 │                 │
+         └─────────────────┼─────────────────┘
+                           ▼
+          Role-Specific Operational Dashboards
    ┌─────────────┬─────────────┬─────────────┬─────────────┐
    ▼             ▼             ▼             ▼             ▼
 Citizen      Hospital       Police         Fire        Admin CAD
@@ -60,16 +67,43 @@ Managed via Alembic in PostgreSQL:
 
 ---
 
+## IoT Edge Firmware (`iot/`)
+
+The repository includes complete production C++ firmware for the **ESP32 DevKit V1**:
+- **Sensor Suite**: MPU-6050 (impact/crash acceleration), DHT22 (ambient fire temperature), MQ-2 (smoke & combustible gases), FSR (impact force), Sound (blast detection), SIM800L (GSM/GPRS fallback).
+- **Edge Intelligence**: Multi-sample debounce filters, threshold-based incident generation, and routine heartbeats.
+- **Fail-Safe Flash Buffer**: Buffers up to 8 emergency events in non-volatile flash memory (`Preferences` / NVS) with priority eviction when offline. Automatically drains once WiFi is restored.
+- **Build & Flash**:
+  ```bash
+  cd iot
+  # Copy secrets template and set WiFi credentials
+  cp include/secrets.example.h include/secrets.h
+  # Build and flash using PlatformIO
+  pio run --target upload
+  ```
+
+---
+
+## Amazon Location Service Integration
+
+The platform leverages **Amazon Location Service** for high-precision routing and map rendering:
+- **Routes (`geo:CalculateRoute`)**: Computes real-world road network distance, travel duration, and route geometry using the `resq-ai-routing` calculator.
+- **Map Vector Tiles & Styles**: Proxied through FastAPI (`/api/v1/maps/style.json`, `/tiles/{z}/{x}/{y}`, `/glyphs/...`, `/sprites/...`) using backend IAM credentials, bypassing browser API key constraints.
+- **Graceful Multi-Tier Fallback**: Automatically degrades to OSRM and local Haversine tortuosity calculations if AWS credentials or network connectivity are unavailable.
+
+---
+
 ## Running the Platform
 
 ### 1. Requirements
 - Python 3.10+
 - PostgreSQL 17 (or 14+) with database `resq_ai`
-- Ollama (optional, local LLM inference)
+- Ollama (optional, for local LLM inference)
+- AWS Credentials configured with Amazon Location permissions (optional, for live AWS maps & routing)
 
 ### 2. Environment Setup
 ```bash
-cd emergency-intelligence-response-main/backend
+cd backend
 cp .env.example .env
 pip install -r requirements.txt
 ```
@@ -100,26 +134,33 @@ python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
 ---
 
-## Automated Test Suite
+## Automated Test Suites
 
-Run comprehensive automated tests verifying all APIs and database persistence:
+Run the full automated test suite verifying backend logic, persistence, and Amazon Location Service:
 ```bash
 cd emergency-intelligence-response-main
+
+# Run backend core tests
 python -m pytest testing/test_backend.py -v
+
+# Run Amazon Location Service integration tests
+python -m pytest testing/test_amazon_location.py -v
 ```
 
 ---
 
 ## API Summary (Canonical `/api/v1/...`)
 
-- `GET  /api/v1/health` — Database and system connectivity check
+- `GET  /api/v1/health` — Database, decision support, and routing connectivity check
 - `POST /api/v1/incidents` — Create incident with AI extraction, priority scoring, and DB persistence
 - `GET  /api/v1/incidents` — List active incidents
 - `GET  /api/v1/incidents/{id}` — Get single incident telemetry
-- `PATCH /api/v1/incidents/{id}` — Update incident status (e.g. ACKNOWLEDGED)
+- `PATCH /api/v1/incidents/{id}` — Update incident status (e.g., ACKNOWLEDGED)
 - `GET  /api/v1/resources/nearby` — Discover verified emergency facilities within radius
 - `POST /api/v1/resources/rank` — Multi-factor ranking (proximity, capacity, emergency match)
-- `GET  /api/v1/routes` — Road routing distance, ETA, and GIS coordinates
+- `GET  /api/v1/routes` — Road routing distance, ETA, and GIS coordinates (Amazon Location / OSRM)
+- `GET  /api/v1/maps/style.json` — MapLibre style descriptor proxy for Amazon Location
+- `GET  /api/v1/maps/tiles/{z}/{x}/{y}` — Vector tile proxy for Amazon Location maps
 - `POST /api/v1/ai/extract` — Structured extraction from text
 - `POST /api/v1/ai/precautions` — Non-diagnostic citizen safety guidelines
 - `POST /api/v1/ai/response` — Role-specific staging guidelines (Hospital, Police, Fire)
