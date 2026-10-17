@@ -13,6 +13,7 @@ from app.api.routes.routing import router as routing_router
 from app.api.routes.ai import router as ai_router
 from app.api.routes.iot import router as iot_router
 from app.api.routes.dashboard import router as dashboard_router
+from app.api.routes.maps import router as maps_router
 
 setup_logging()
 
@@ -53,6 +54,7 @@ app.include_router(routing_router, prefix=settings.API_V1_STR, tags=["Routing"])
 app.include_router(ai_router, prefix=settings.API_V1_STR, tags=["AI Decision Support"])
 app.include_router(iot_router, prefix=settings.API_V1_STR, tags=["IoT Gateways"])
 app.include_router(dashboard_router, prefix=settings.API_V1_STR, tags=["Dashboard"])
+app.include_router(maps_router, prefix=settings.API_V1_STR, tags=["Amazon Location Maps"])
 
 # 2. Backward Compatibility Aliases (/api and root)
 app.include_router(health_router, prefix="/api", tags=["Aliases"])

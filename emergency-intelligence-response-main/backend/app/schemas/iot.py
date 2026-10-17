@@ -5,7 +5,7 @@ from datetime import datetime
 
 class IoTEventCreate(BaseModel):
     device_id: str = Field(..., min_length=2, description="Unique ESP32 device ID")
-    event_type: str = Field(default="ACCIDENT", description="Triggered event type: ACCIDENT, FIRE, FLOOD, TELEMETRY")
+    event_type: str = Field(default="TELEMETRY", description="Triggered event type: ACCIDENT, FIRE, FLOOD, TELEMETRY")
     temperature: Optional[float] = Field(None, ge=-40.0, le=150.0, description="Temperature in Celsius")
     smoke_level: Optional[float] = Field(None, ge=0.0, le=10000.0, description="Smoke/gas sensor PPM")
     water_level: Optional[float] = Field(None, ge=0.0, le=500.0, description="Water level in cm")

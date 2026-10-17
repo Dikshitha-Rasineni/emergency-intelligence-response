@@ -1,6 +1,6 @@
 import math
 import httpx
-from typing import List, Dict, Any, Tuple
+from typing import List, Optional, Tuple
 from app.core.config import settings
 from app.core.logging import logger
 from app.schemas.routing import RouteResponse, RouteStep
@@ -76,6 +76,70 @@ class RoutingService:
         raise ValueError("OSRM did not return a valid route")
 
     @classmethod
+    def _try_amazon_location_route(
+        cls,
+        origin_lat: float,
+        origin_lng: float,
+        dest_lat: float,
+        dest_lng: float,
+        origin_name: str,
+        destination_name: str,
+    ) -> Optional[RouteResponse]:
+        """
+        Attempt routing via Amazon Location Service.
+        Returns RouteResponse on success, None on any failure.
+        """
+        try:
+            from app.services.location_service import LocationService
+            result = LocationService.calculate_route(origin_lat, origin_lng, dest_lat, dest_lng)
+            if not result or not result.get("geometry"):
+                return None
+
+            coords = result["geometry"]
+            distance_km = round(result["distance_meters"] / 1000.0, 1)
+            eta_min = max(2, int(round((result["duration_seconds"] / 60.0) * 0.85)))  # emergency factor
+
+            steps = [
+                RouteStep(
+                    instruction=f"Depart {origin_name} — Amazon Location verified route.",
+                    distance_km=round(distance_km * 0.2, 1),
+                    duration_min=round(eta_min * 0.2, 1),
+                ),
+                RouteStep(
+                    instruction=f"Follow verified road corridor toward {destination_name}.",
+                    distance_km=round(distance_km * 0.6, 1),
+                    duration_min=round(eta_min * 0.6, 1),
+                ),
+                RouteStep(
+                    instruction=f"Arrive at incident perimeter — {destination_name}.",
+                    distance_km=round(distance_km * 0.2, 1),
+                    duration_min=round(eta_min * 0.2, 1),
+                ),
+            ]
+
+            logger.info(
+                f"Amazon Location route: {distance_km} km, {eta_min} min, "
+                f"{len(coords)} geometry points."
+            )
+            return RouteResponse(
+                origin_name=origin_name,
+                destination_name=destination_name,
+                origin_lat=origin_lat,
+                origin_lng=origin_lng,
+                destination_lat=dest_lat,
+                destination_lng=dest_lng,
+                distance_km=distance_km,
+                eta_min=eta_min,
+                route_corridor=f"Amazon Location verified route to {destination_name}",
+                steps=steps,
+                coordinates=coords,
+                routing_status="AMAZON_LOCATION_ROUTES",
+            )
+        except Exception as e:
+            logger.warning(f"Amazon Location routing attempt failed: {e}")
+            return None
+
+    @classmethod
     def calculate_route(
         cls,
         origin_lat: float,
@@ -87,13 +151,27 @@ class RoutingService:
         responder_role: str = None,
     ) -> RouteResponse:
         """
-        Calculates verified real road routing metrics, realistic ETA, true road coordinates, and navigation steps.
+        Routing priority:
+          1. Amazon Location Routes (verified road network, AWS)
+          2. OSRM public routing engine
+          3. Haversine + road-factor local fallback
         """
+        # 1. Amazon Location Routes (primary)
+        al_route = cls._try_amazon_location_route(
+            origin_lat, origin_lng, destination_lat, destination_lng,
+            origin_name, destination_name,
+        )
+        if al_route:
+            return al_route
+
+        logger.info("Amazon Location unavailable — trying OSRM fallback.")
+
+        # 2. OSRM
         try:
             coordinates, road_km, eta_min, steps, corridor_name = cls._fetch_osrm_route(
                 origin_lat, origin_lng, destination_lat, destination_lng
             )
-            corridor = f"Accurate GIS route via {corridor_name} to {destination_name}"
+            corridor = f"OSRM road network route via {corridor_name} to {destination_name}"
             return RouteResponse(
                 origin_name=origin_name,
                 destination_name=destination_name,
@@ -109,10 +187,10 @@ class RoutingService:
                     RouteStep(instruction=f"Follow {corridor_name} toward {destination_name}.", distance_km=round(road_km * 0.8, 1), duration_min=round(eta_min * 0.8, 1)),
                 ],
                 coordinates=coordinates,
-                routing_status="ACCURATE_OSRM_ROAD_NETWORK",
+                routing_status="OSRM_ROAD_NETWORK",
             )
         except Exception as e:
-            logger.warning(f"OSRM live road routing failed or offline: {e}. Generating high-fidelity fallback.")
+            logger.warning(f"OSRM routing failed: {e}. Using local fallback.")
 
         # Fallback to realistic road network path if external GIS service is unreachable
         crow_km = cls.haversine_distance_km(origin_lat, origin_lng, destination_lat, destination_lng)

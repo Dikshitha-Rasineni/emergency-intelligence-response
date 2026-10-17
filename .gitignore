@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+
+# Environment variables
+.env
+.env.*
+!.env.example
+secrets.h
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+
+# PlatformIO
+.pio/
+
+# OS and IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

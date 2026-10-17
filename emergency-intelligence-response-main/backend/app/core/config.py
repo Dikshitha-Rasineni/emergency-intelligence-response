@@ -47,5 +47,10 @@ class Settings(BaseSettings):
     PRIORITY_HIGH_THRESHOLD: int = 50
     PRIORITY_MODERATE_THRESHOLD: int = 25
 
+    # Amazon Location Service
+    AWS_REGION: str = "us-east-1"
+    AWS_LOCATION_MAP_NAME: str = "resq-ai-maps"
+    AWS_LOCATION_ROUTE_CALCULATOR: str = "resq-ai-routing"
+
 
 settings = Settings()

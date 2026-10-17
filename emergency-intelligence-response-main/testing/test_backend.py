@@ -117,7 +117,7 @@ def test_route_calculation():
     assert route["distance_km"] > 0
     assert route["eta_min"] > 0
     assert len(route["coordinates"]) > 2
-    assert len(route["steps"]) >= 4
+    assert len(route["steps"]) >= 1  # Amazon Location returns summary steps; OSRM returns granular steps
 
 
 def test_ai_precautions():
@@ -167,3 +167,17 @@ def test_iot_event_ingestion():
     assert data["status"] == "PROCESSED"
     assert data["incident_id"] is not None
     assert data["severity"] in ["CRITICAL", "HIGH"]
+
+
+def test_iot_event_without_type_defaults_to_telemetry():
+    payload = {
+        "device_id": "RESQ-TEST-DEFAULT",
+        "temperature": 25.0,
+        "latitude": 12.9,
+        "longitude": 80.1,
+    }
+    response = client.post("/api/v1/iot/events", json=payload)
+    assert response.status_code == 201
+    data = response.json()
+    assert data["event_type"] == "TELEMETRY"
+    assert data["incident_id"] is None

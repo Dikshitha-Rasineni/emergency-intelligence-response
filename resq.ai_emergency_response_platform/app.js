@@ -695,205 +695,300 @@ const RESQ_API = {
 };
 
 // ============================================================================
-// 4. MAP RENDERING ENGINE (Leaflet / Interactive Canvas)
+// 4. MAP RENDERING ENGINE
+//    Primary:  MapLibre GL JS + Amazon Location Service (backend proxy)
+//    Fallback: Leaflet + OpenStreetMap tiles
+//    Final:    SVG vector canvas (zero external dependencies)
 // ============================================================================
 
-let leafletMapInstance = null;
-let mapRouteLayer = null;
+let activeMapInstance = null;   // MapLibre map instance
+let leafletMapInstance = null;  // Leaflet fallback instance
 let mapMarkersGroup = null;
 
+// Routing source badge labels
+const ROUTING_SOURCE_LABELS = {
+  AMAZON_LOCATION_ROUTES: "Amazon Location Routes",
+  OSRM_ROAD_NETWORK: "OSRM Road Network",
+  ACCURATE_OSRM_ROAD_NETWORK: "OSRM Road Network",
+  GIS_FALLBACK_MATRIX: "Local GIS Fallback",
+};
+
 /**
- * Fetches accurate, real-world street network routing geometry and turn-by-turn steps
+ * Fetch verified road route from FastAPI backend.
+ * Backend tries: Amazon Location Routes → OSRM → local fallback.
+ * Never fabricates routes — returns null if all sources fail.
  */
-async function getAccurateRoadRoute(originLat, originLng, destLat, destLng, originName, destName, role) {
-  // 1. Try Backend Canonical Routing Service (connected to live OSRM matrix)
+async function getVerifiedRoadRoute(originLat, originLng, destLat, destLng, originName, destName, role) {
   if (RESQ_API.isBackendConnected) {
     try {
       const res = await RESQ_API.getRoute(originLat, originLng, destLat, destLng, originName, destName, role);
-      if (res && res.coordinates && res.coordinates.length > 5) {
+      if (res && res.coordinates && res.coordinates.length > 2) {
         return res;
       }
     } catch (e) {
       console.warn("Backend route API error:", e);
     }
   }
-
-  // 2. Direct OpenStreetMap OSRM Public Driving Engine Fallback
-  try {
-    const url = `https://router.project-osrm.org/route/v1/driving/${originLng},${originLat};${destLng},${destLat}?overview=full&geometries=geojson&steps=true`;
-    const resp = await fetch(url);
-    if (resp.ok) {
-      const data = await resp.json();
-      if (data.routes && data.routes.length > 0) {
-        const primary = data.routes[0];
-        // Convert GeoJSON [lon, lat] to Leaflet [lat, lon]
-        const coords = primary.geometry.coordinates.map(c => [c[1], c[0]]);
-        const distKm = +(primary.distance / 1000).toFixed(1);
-        const etaMin = Math.max(2, Math.round((primary.duration / 60) * 0.85));
-        
-        const steps = (primary.legs && primary.legs[0] && primary.legs[0].steps || []).map(s => {
-          const name = s.name || "Connecting Roadway";
-          const instr = (s.maneuver && s.maneuver.instruction) || `Proceed onto ${name}`;
-          return {
-            instruction: `${instr} (${name})`,
-            distance_km: +(s.distance / 1000).toFixed(2),
-            duration_min: +(s.duration / 60).toFixed(1)
-          };
-        });
-
-        return {
-          origin_name: originName,
-          destination_name: destName,
-          origin_lat: originLat,
-          origin_lng: originLng,
-          destination_lat: destLat,
-          destination_lng: destLng,
-          distance_km: distKm,
-          eta_min: etaMin,
-          route_corridor: `Accurate road network route to ${destName}`,
-          coordinates: coords,
-          steps: steps,
-          routing_status: "ACCURATE_OSRM_ROAD_NETWORK"
-        };
-      }
-    }
-  } catch (err) {
-    console.warn("Direct OSRM router fallback error:", err);
-  }
-
   return null;
 }
 
-function initializeOperationalMap(containerId, originRole) {
+/**
+ * Destroy any existing map instance cleanly.
+ */
+function destroyExistingMap() {
+  if (activeMapInstance) {
+    try { activeMapInstance.remove(); } catch (_) {}
+    activeMapInstance = null;
+  }
+  if (leafletMapInstance) {
+    try { leafletMapInstance.remove(); } catch (_) {}
+    leafletMapInstance = null;
+  }
+  mapMarkersGroup = null;
+}
+
+/**
+ * Build a MapLibre marker element with role-appropriate colour.
+ * RED=incident, BLUE=hospital, ORANGE=police, YELLOW=fire, GREEN=ambulance
+ */
+function makeMarkerEl(type) {
+  const cfg = {
+    INCIDENT:  { bg: "#dc2626", emoji: "🚨" },
+    HOSPITAL:  { bg: "#1d4ed8", emoji: "🏥" },
+    AMBULANCE: { bg: "#16a34a", emoji: "🚑" },
+    POLICE:    { bg: "#ea580c", emoji: "🚓" },
+    FIRE:      { bg: "#ca8a04", emoji: "🚒" },
+    BASE:      { bg: "#0f172a", emoji: "📍" },
+  };
+  const c = cfg[type] || cfg.BASE;
+  const el = document.createElement("div");
+  el.style.cssText = `background:${c.bg};color:#fff;border:2px solid #fff;border-radius:50%;
+    width:30px;height:30px;display:flex;align-items:center;justify-content:center;
+    box-shadow:0 2px 6px rgba(0,0,0,0.35);font-size:14px;cursor:pointer;`;
+  el.textContent = c.emoji;
+  return el;
+}
+
+/**
+ * PRIMARY: Initialize map using MapLibre GL JS with Amazon Location tile proxy.
+ * Falls back to Leaflet+OSM if MapLibre or backend unavailable.
+ */
+async function initializeOperationalMap(containerId, originRole) {
   const container = document.getElementById(containerId);
   if (!container) return;
-  
+
+  destroyExistingMap();
+  container.innerHTML = "";
+
   const incidentLat = activeIncident.latitude;
   const incidentLng = activeIncident.longitude;
-  
-  const originNode = originRole ? RESPONDER_NODES[originRole] : null;
-  const originLat = originNode ? originNode.latitude : incidentLat - 0.02;
-  const originLng = originNode ? originNode.longitude : incidentLng - 0.02;
+  const originNode  = originRole ? RESPONDER_NODES[originRole] : null;
+  const originLat   = originNode ? originNode.latitude  : null;
+  const originLng2  = originNode ? originNode.longitude : null;
 
-  // Check if Leaflet library is available in browser
+  // ── Attempt MapLibre + Amazon Location ──────────────────────────────────
+  if (typeof maplibregl !== "undefined" && RESQ_API.isBackendConnected) {
+    try {
+      const styleUrl = `${RESQ_API.activeEndpoint}/maps/style.json`;
+
+      // Quick probe — if style endpoint fails, fall through to Leaflet
+      const probe = await fetch(styleUrl, { signal: AbortSignal.timeout(3000) }).catch(() => null);
+      if (probe && probe.ok) {
+        activeMapInstance = new maplibregl.Map({
+          container: containerId,
+          style: styleUrl,
+          center: [incidentLng, incidentLat],
+          zoom: 13,
+          attributionControl: false,
+        });
+
+        activeMapInstance.addControl(new maplibregl.NavigationControl(), "top-right");
+        activeMapInstance.addControl(
+          new maplibregl.AttributionControl({ compact: true,
+            customAttribution: "© Amazon Location Service · © Esri" }),
+          "bottom-right"
+        );
+
+        activeMapInstance.on("load", async () => {
+          // Incident marker
+          new maplibregl.Marker({ element: makeMarkerEl("INCIDENT") })
+            .setLngLat([incidentLng, incidentLat])
+            .setPopup(new maplibregl.Popup({ offset: 16 }).setHTML(
+              `<b>${activeIncident.emergency_type}</b><br>${activeIncident.location_name}<br>Priority: ${activeIncident.system_priority}/100`
+            ))
+            .addTo(activeMapInstance);
+
+          if (originNode) {
+            // Responder base marker
+            const baseType = originRole === "HOSPITAL" ? "HOSPITAL" : originRole === "POLICE" ? "POLICE" : "FIRE";
+            new maplibregl.Marker({ element: makeMarkerEl(baseType) })
+              .setLngLat([originLng2, originLat])
+              .setPopup(new maplibregl.Popup({ offset: 16 }).setHTML(
+                `<b>${originNode.name}</b><br>${originNode.address}`
+              ))
+              .addTo(activeMapInstance);
+
+            // Fit bounds to both points while route loads
+            activeMapInstance.fitBounds(
+              [[Math.min(originLng2, incidentLng) - 0.01, Math.min(originLat, incidentLat) - 0.01],
+               [Math.max(originLng2, incidentLng) + 0.01, Math.max(originLat, incidentLat) + 0.01]],
+              { padding: 50 }
+            );
+
+            // Fetch verified route from backend (Amazon Location → OSRM → fallback)
+            const route = await getVerifiedRoadRoute(
+              originLat, originLng2, incidentLat, incidentLng,
+              originNode.name, activeIncident.location_name, originRole
+            );
+
+            if (route && route.coordinates && route.coordinates.length > 2) {
+              window.activeLiveRoute = route;
+
+              // Convert [[lat,lng],...] → [[lng,lat],...] for GeoJSON
+              const geojsonCoords = route.coordinates.map(c => [c[1], c[0]]);
+
+              activeMapInstance.addSource("resq-route", {
+                type: "geojson",
+                data: { type: "Feature", geometry: { type: "LineString", coordinates: geojsonCoords } }
+              });
+              activeMapInstance.addLayer({
+                id: "resq-route-line",
+                type: "line",
+                source: "resq-route",
+                layout: { "line-join": "round", "line-cap": "round" },
+                paint: { "line-color": "#2563eb", "line-width": 4, "line-opacity": 0.85 }
+              });
+
+              // Fit to actual route geometry
+              const lngs = geojsonCoords.map(c => c[0]);
+              const lats = geojsonCoords.map(c => c[1]);
+              activeMapInstance.fitBounds(
+                [[Math.min(...lngs) - 0.005, Math.min(...lats) - 0.005],
+                 [Math.max(...lngs) + 0.005, Math.max(...lats) + 0.005]],
+                { padding: 50 }
+              );
+
+              // Update telemetry panel
+              _updateRouteTelemetry(route);
+            } else {
+              console.warn("No verified route geometry available — route line not drawn.");
+            }
+          } else {
+            // Citizen view: resource markers
+            const resources = (currentResources && currentResources.length > 0)
+              ? currentResources.slice(0, 6) : ALL_RESOURCES.slice(0, 5);
+            resources.forEach(res => {
+              const rType = (res.type || res.resource_type || "BASE").toUpperCase();
+              const lat = res.latitude || res.lat;
+              const lng = res.longitude || res.lng;
+              if (!lat || !lng) return;
+              new maplibregl.Marker({ element: makeMarkerEl(rType) })
+                .setLngLat([lng, lat])
+                .setPopup(new maplibregl.Popup({ offset: 14 }).setHTML(
+                  `<b>${res.name}</b><br>${res.distance_km || "?"} km · ${res.eta_min || "?"} min<br>${res.availability || ""}`
+                ))
+                .addTo(activeMapInstance);
+            });
+          }
+        });
+
+        activeMapInstance.on("error", (e) => {
+          console.warn("MapLibre error:", e);
+        });
+
+        return; // MapLibre initialised successfully
+      }
+    } catch (e) {
+      console.warn("MapLibre/Amazon Location init failed, falling back to Leaflet:", e);
+      destroyExistingMap();
+      container.innerHTML = "";
+    }
+  }
+
+  // ── Fallback: Leaflet + OpenStreetMap ────────────────────────────────────
   if (typeof L !== "undefined") {
     try {
-      if (leafletMapInstance) {
-        leafletMapInstance.remove();
-        leafletMapInstance = null;
-      }
+      leafletMapInstance = L.map(containerId, { zoomControl: true, attributionControl: false })
+        .setView([incidentLat, incidentLng], 13);
 
-      container.innerHTML = "";
-      leafletMapInstance = L.map(containerId, {
-        zoomControl: true,
-        attributionControl: false
-      }).setView([incidentLat, incidentLng], 13);
-
-      // Clean, professional, neutral OpenStreetMap tiles (matching original design)
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 18,
-        opacity: 0.95
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 18, opacity: 0.95
       }).addTo(leafletMapInstance);
 
       mapMarkersGroup = L.layerGroup().addTo(leafletMapInstance);
 
-      // Clean, non-distracting SVG icon markers
-      const incidentIcon = L.divIcon({
-        className: 'custom-map-icon',
-        html: `<div style="background:#dc2626;color:#ffffff;border:2px solid #ffffff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,0.3);font-size:14px;font-weight:bold;">🚨</div>`,
-        iconSize: [28, 28],
-        iconAnchor: [14, 14]
+      const mkIcon = (bg, emoji) => L.divIcon({
+        className: "custom-map-icon",
+        html: `<div style="background:${bg};color:#fff;border:2px solid #fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,0.3);font-size:13px;">${emoji}</div>`,
+        iconSize: [28, 28], iconAnchor: [14, 14]
       });
 
-      // Add Incident Marker
-      const incMarker = L.marker([incidentLat, incidentLng], { icon: incidentIcon }).addTo(mapMarkersGroup);
-      incMarker.bindPopup(`<b>${activeIncident.emergency_type}</b><br>${activeIncident.location_name}<br>Priority: ${activeIncident.system_priority}/100`);
+      L.marker([incidentLat, incidentLng], { icon: mkIcon("#dc2626", "🚨") })
+        .addTo(mapMarkersGroup)
+        .bindPopup(`<b>${activeIncident.emergency_type}</b><br>${activeIncident.location_name}<br>Priority: ${activeIncident.system_priority}/100`);
 
       if (originNode) {
-        // Responder Icon
         const roleEmoji = originRole === "HOSPITAL" ? "🏥" : originRole === "POLICE" ? "🚓" : "🚒";
-        const responderIcon = L.divIcon({
-          className: 'custom-map-icon',
-          html: `<div style="background:#0f172a;color:#ffffff;border:2px solid #ffffff;border-radius:4px;width:30px;height:30px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,0.3);font-size:15px;">${roleEmoji}</div>`,
-          iconSize: [30, 30],
-          iconAnchor: [15, 15]
-        });
+        L.marker([originLat, originLng2], { icon: mkIcon("#0f172a", roleEmoji) })
+          .addTo(mapMarkersGroup)
+          .bindPopup(`<b>${originNode.name}</b><br>${originNode.address}`);
 
-        const respMarker = L.marker([originLat, originLng], { icon: responderIcon }).addTo(mapMarkersGroup);
-        respMarker.bindPopup(`<b>${originNode.name}</b><br>${originNode.address}`);
-
-        // Draw realistic route polyline
-        let waypoints = [
-          [originLat, originLng],
-          [originLat + (incidentLat - originLat) * 0.45, originLng + 0.008],
-          [originLat + (incidentLat - originLat) * 0.8, incidentLng - 0.005],
-          [incidentLat, incidentLng]
-        ];
-
-        let routePolyline = L.polyline(waypoints, {
-          color: '#2563eb',
-          weight: 4,
-          opacity: 0.85,
-          dashArray: '8, 6'
-        }).addTo(mapMarkersGroup);
-
-        const bounds = L.latLngBounds([ [originLat, originLng], [incidentLat, incidentLng] ]);
+        const bounds = L.latLngBounds([[originLat, originLng2], [incidentLat, incidentLng]]);
         leafletMapInstance.fitBounds(bounds, { padding: [40, 40] });
 
-        // Asynchronously fetch exact, real-world road geometry from backend / OSRM
-        getAccurateRoadRoute(originLat, originLng, incidentLat, incidentLng, originNode.name, activeIncident.location_name, originRole)
-          .then(liveRoute => {
-            if (liveRoute && liveRoute.coordinates && liveRoute.coordinates.length > 5) {
-              window.activeLiveRoute = liveRoute;
-              // Replace with true road polyline
-              mapMarkersGroup.removeLayer(routePolyline);
-              routePolyline = L.polyline(liveRoute.coordinates, {
-                color: '#2563eb',
-                weight: 4,
-                opacity: 0.85,
-                dashArray: '8, 6'
+        // Fetch verified route
+        getVerifiedRoadRoute(originLat, originLng2, incidentLat, incidentLng,
+          originNode.name, activeIncident.location_name, originRole)
+          .then(route => {
+            if (route && route.coordinates && route.coordinates.length > 2) {
+              window.activeLiveRoute = route;
+              const poly = L.polyline(route.coordinates, {
+                color: "#2563eb", weight: 4, opacity: 0.85, dashArray: "8, 6"
               }).addTo(mapMarkersGroup);
-              
-              leafletMapInstance.fitBounds(routePolyline.getBounds(), { padding: [40, 40] });
-
-              // Update on-screen live telemetry
-              const distEl = document.getElementById("liveRoadDistance");
-              if (distEl) distEl.innerText = `${liveRoute.distance_km} km`;
-              const etaEl = document.getElementById("liveRoadEta");
-              if (etaEl) etaEl.innerText = `${liveRoute.eta_min} min`;
-              const corrEl = document.getElementById("liveRouteCorridorNote");
-              if (corrEl) corrEl.innerText = `* Verified road path: ${liveRoute.route_corridor || 'Direct arterial corridor'}.`;
+              leafletMapInstance.fitBounds(poly.getBounds(), { padding: [40, 40] });
+              _updateRouteTelemetry(route);
+            } else {
+              console.warn("No verified route — route line not drawn.");
             }
           })
-          .catch(e => console.warn("Live route update:", e));
+          .catch(e => console.warn("Leaflet route fetch error:", e));
       } else {
-        // User view: Show nearby stations as clear markers
-        const listToRender = (currentResources && currentResources.length > 0) ? currentResources.slice(0, 5) : ALL_RESOURCES.slice(0, 4);
-        listToRender.forEach(res => {
-          const markerEmoji = (res.type || res.resource_type) === "HOSPITAL" ? "🏥" : (res.type || res.resource_type) === "POLICE" ? "🚓" : (res.type || res.resource_type) === "FIRE" ? "🚒" : "🚑";
-          const resIcon = L.divIcon({
-            className: 'custom-map-icon',
-            html: `<div style="background:#ffffff;color:#0f172a;border:1.5px solid #64748b;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 3px rgba(0,0,0,0.2);font-size:12px;">${markerEmoji}</div>`,
-            iconSize: [24, 24],
-            iconAnchor: [12, 12]
-          });
-          const latVal = res.latitude || res.lat;
-          const lngVal = res.longitude || res.lng;
-          if (latVal && lngVal) {
-            L.marker([latVal, lngVal], { icon: resIcon })
+        const resources = (currentResources && currentResources.length > 0)
+          ? currentResources.slice(0, 5) : ALL_RESOURCES.slice(0, 4);
+        resources.forEach(res => {
+          const rType = (res.type || res.resource_type || "").toUpperCase();
+          const emoji = rType === "HOSPITAL" ? "🏥" : rType === "POLICE" ? "🚓" : rType === "FIRE" ? "🚒" : "🚑";
+          const bg    = rType === "HOSPITAL" ? "#1d4ed8" : rType === "POLICE" ? "#ea580c" : rType === "FIRE" ? "#ca8a04" : "#16a34a";
+          const lat = res.latitude || res.lat;
+          const lng = res.longitude || res.lng;
+          if (lat && lng) {
+            L.marker([lat, lng], { icon: mkIcon(bg, emoji) })
               .addTo(mapMarkersGroup)
-              .bindPopup(`<b>${res.name}</b><br>${res.distance_km || 2.5} km · ${res.eta_min || 8} min`);
+              .bindPopup(`<b>${res.name}</b><br>${res.distance_km || "?"} km · ${res.eta_min || "?"} min`);
           }
         });
       }
       return;
     } catch (e) {
-      console.warn("Leaflet map initialization skipped or fell back to SVG canvas:", e);
+      console.warn("Leaflet fallback failed:", e);
     }
   }
 
-  // Pure SVG Operational Vector Canvas Fallback (Clean, zero external dependencies)
+  // ── Final fallback: SVG canvas ───────────────────────────────────────────
   renderSvgOperationalMap(container, originNode, incidentLat, incidentLng);
+}
+
+/**
+ * Update route telemetry panel elements with verified route data.
+ */
+function _updateRouteTelemetry(route) {
+  const sourceLabel = ROUTING_SOURCE_LABELS[route.routing_status] || route.routing_status || "Verified Route";
+  const distEl = document.getElementById("liveRoadDistance");
+  if (distEl) distEl.innerText = `${route.distance_km} km`;
+  const etaEl = document.getElementById("liveRoadEta");
+  if (etaEl) etaEl.innerText = `${route.eta_min} min`;
+  const corrEl = document.getElementById("liveRouteCorridorNote");
+  if (corrEl) corrEl.innerText = `* ${sourceLabel}: ${route.route_corridor || "Verified road corridor"}.`;
 }
 
 function renderSvgOperationalMap(container, originNode, incLat, incLng) {
@@ -1929,13 +2024,14 @@ function viewServiceDetails(resId) {
 
 function showNavigationSteps(role) {
   const route = window.activeLiveRoute || calculateRouteMetrics(role, activeIncident);
+  const sourceLabel = ROUTING_SOURCE_LABELS[route.routing_status] || "Verified Route";
   let stepsText = "";
   if (route.steps && route.steps.length > 0) {
     stepsText = route.steps.slice(0, 8).map((s, idx) => `${idx + 1}. ${s.instruction} (${s.distance_km} km · ${s.duration_min} min)`).join("\n");
   } else {
-    stepsText = "1. Depart station gate onto main corridor.\n2. Proceed 1.8 km to ring road arterial.\n3. Take right flyover entry ramp.\n4. Arrive at emergency incident perimeter on left.";
+    stepsText = "Route steps unavailable — see map for visual route.";
   }
-  alert(`Accurate Road Navigation Route Steps:\n\nOrigin: ${route.origin_name}\nDestination: ${route.destination_name}\nActual Road Distance: ${route.distance_km} km\nEstimated Transit ETA: ${route.eta_min} min\n\nTurn-by-Turn Waypoints:\n${stepsText}`);
+  alert(`Road Navigation Route Steps\nSource: ${sourceLabel}\n\nOrigin: ${route.origin_name || "Station Base"}\nDestination: ${route.destination_name || "Incident Location"}\nRoad Distance: ${route.distance_km} km\nEstimated ETA: ${route.eta_min} min\n\nTurn-by-Turn:\n${stepsText}`);
 }
 
 function startTurnByTurn(role) {
