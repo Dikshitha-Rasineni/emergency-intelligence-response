@@ -63,10 +63,10 @@ jobs:
         run: python -m app.db.seed_demo_data
 
       - name: Run backend tests
-        run: python -m pytest ../testing/test_backend.py -q
+        run: python -m pytest ../testing/test_backend.py ../testing/test_fullstack_fixes.py -q
 
       - name: Compile Python sources
-        run: python -m compileall -q backend app
+        run: python -m compileall -q app
 
   frontend-syntax:
     name: Frontend syntax checks
