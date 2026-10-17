@@ -46,6 +46,15 @@ class IncidentService:
         if coords_verified is None:
             coords_verified = True
         detected_lang = getattr(report, "detected_language", "en") or "en"
+        english_desc = LanguageService.get_english_dispatch_summary(
+            text=report.description,
+            emergency_type=emergency_type,
+            location=loc_name,
+            injuries=report.injuries,
+            affected_people=report.affected_people,
+            indicators=critical_indicators,
+            lang=detected_lang,
+        )
 
         return IncidentResponse(
             incident_id=report.id,
@@ -73,7 +82,10 @@ class IncidentService:
             updated_at=report.updated_at,
             precautions=precautions,
             recommendations=rec_data,
+            english_description=english_desc,
+            dispatch_summary_en=english_desc,
         )
+
 
     @classmethod
     def create_incident(cls, db: Session, data: IncidentCreate) -> IncidentResponse:
@@ -177,6 +189,7 @@ class IncidentService:
             priority=score,
             lang=detected_lang,
         )
+        # Role intelligence for control rooms is strictly English
         role_intel = AIService.generate_role_intelligence(
             role="ALL",
             emergency_type=emergency_type,
@@ -185,7 +198,7 @@ class IncidentService:
             injuries=injuries,
             critical_indicators=indicators,
             priority_score=score,
-            lang=detected_lang,
+            lang="en",
         )
 
         rec_record = ResponseRecommendation(
@@ -294,6 +307,7 @@ class IncidentService:
                 priority=score,
                 lang=report.detected_language,
             )
+            # Role intelligence for control rooms is strictly English
             role_intel = AIService.generate_role_intelligence(
                 role="ALL",
                 emergency_type=extraction.emergency_type,
@@ -302,7 +316,7 @@ class IncidentService:
                 injuries=report.injuries,
                 critical_indicators=extraction.critical_indicators,
                 priority_score=score,
-                lang=report.detected_language,
+                lang="en",
             )
             if report.recommendations:
                 rec = report.recommendations[0]

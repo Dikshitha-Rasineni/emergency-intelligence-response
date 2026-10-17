@@ -1505,6 +1505,15 @@ function renderResponderDashboard(role) {
   const isAck = acknowledgementState[role].acknowledged;
   const isCritical = activeIncident.system_priority >= 75;
 
+  // Control rooms strictly receive English output
+  const rawLang = (activeIncident.detected_language || activeIncident.language || "en").toLowerCase();
+  const isNonEnglish = rawLang !== "en" && rawLang !== "auto";
+  const englishDispatchText = activeIncident.english_description || activeIncident.dispatch_summary_en || (
+    isNonEnglish
+      ? `CAD Dispatch: ${activeIncident.emergency_type} at ${activeIncident.location_name || activeIncident.location || 'Incident Site'}. ${activeIncident.injuries || 0} casualties reported (${activeIncident.affected_people || 0} individuals affected). Priority responder deployment required.`
+      : activeIncident.description
+  );
+
   container.innerHTML = `
     <!-- Top Organization Header Bar -->
     <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:var(--radius-md);padding:14px 18px;margin-bottom:16px;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;">
@@ -1542,10 +1551,20 @@ function renderResponderDashboard(role) {
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
             <span class="badge ${isCritical ? 'badge-emergency' : 'badge-warning'} mono">${activeIncident.incident_id}</span>
             <span style="font-weight:700;font-size:16px;color:#0f172a;">${activeIncident.emergency_type}</span>
-            <span class="tag-fact">${activeIncident.timestamp}</span>
+            <span class="tag-fact">${activeIncident.timestamp || 'ACTIVE'}</span>
+            <span class="badge" style="background:#0f172a;color:#ffffff;font-size:10px;">EN DISPATCH</span>
           </div>
-          <p style="font-size:13px;color:#334155;">${activeIncident.description}</p>
+          <p style="font-size:13px;color:#1e293b;font-weight:500;">${englishDispatchText}</p>
+          ${isNonEnglish ? `
+            <details style="margin-top:6px;font-size:11px;color:#64748b;">
+              <summary style="cursor:pointer;color:#475569;font-weight:600;">Original Citizen Input (${rawLang.toUpperCase()})</summary>
+              <div style="margin-top:4px;padding:6px 10px;background:#ffffff;border-radius:4px;border:1px solid #e2e8f0;font-style:italic;">
+                "${activeIncident.description}"
+              </div>
+            </details>
+          ` : ''}
         </div>
+
         
         <!-- Urgency Metrics & Acknowledgement Button -->
         <div style="display:flex;align-items:center;gap:16px;">

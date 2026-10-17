@@ -348,6 +348,36 @@ class LanguageService:
             ]
 
     @classmethod
+    def get_english_dispatch_summary(
+        cls,
+        text: str,
+        emergency_type: str,
+        location: Optional[str] = None,
+        injuries: int = 0,
+        affected_people: int = 0,
+        indicators: Optional[List[str]] = None,
+        lang: str = "en",
+    ) -> str:
+        """
+        Synthesizes / translates a standardized English CAD dispatch narrative.
+        Guarantees that control rooms, dispatchers, and responders receive strictly English output,
+        regardless of whether citizen reports are submitted in Telugu, Tamil, Hindi, Kannada, or Malayalam.
+        """
+        if lang == "en":
+            return text
+
+        loc_str = f" at {location}" if location and location != "Location Unspecified" else ""
+        cas_str = f"{injuries} casualty(ies) reported" if injuries > 0 else (
+            f"{affected_people} individual(s) affected" if affected_people > 0 else "No immediate casualties reported"
+        )
+        ind_str = f" Critical factors: {', '.join(indicators)}." if indicators else ""
+
+        return (
+            f"CAD Dispatch: {emergency_type}{loc_str}. "
+            f"{cas_str}.{ind_str} Priority responder deployment required."
+        )
+
+    @classmethod
     def get_role_intelligence(
         cls,
         role: str,
@@ -357,131 +387,54 @@ class LanguageService:
         priority_score: int,
         lang: str = "en",
     ) -> Dict[str, any]:
-        """Returns localized role directives."""
+        """
+        Returns role intelligence for emergency control rooms.
+        Control rooms and responder units strictly receive standardized English output,
+        ensuring cross-jurisdictional clarity without translation delay or language barriers.
+        """
         role = role.upper()
 
-        if lang == "te":
-            if role == "HOSPITAL":
-                summary = f"{injuries} మంది క్షతగాత్రులతో {emergency_type} కొరకు లెవల్-1 ట్రామా రెస్పాన్స్. ప్రాధాన్యత {priority_score}/100."
-                recommendation = "ట్రామా వార్డును సిద్ధం చేయండి, డ్యూటీలో ఉన్న సర్జికల్ బృందాన్ని అప్రమత్తం చేయండి మరియు అంబులెన్స్ రాంప్‌ను ఖాళీగా ఉంచండి."
-                checklist = [
-                    f"{max(1, injuries)} అత్యవసర ట్రామా బెడ్‌లను సిద్ధం చేయండి.",
-                    "ఆర్థోపెడిక్ మరియు అత్యవసర వైద్య నిపుణులను అప్రమత్తం చేయండి.",
-                    "రక్తనిధిలో O-నెగటివ్ రక్తాన్ని అందుబాటులో ఉంచండి.",
-                ]
-            elif role == "POLICE":
-                summary = f"{emergency_type} కొరకు పోలీసు భద్రత మరియు ట్రాఫిక్ క్లియరెన్స్ అలర్ట్ (ప్రాధాన్యత {priority_score}/100)."
-                recommendation = "సంఘటనా స్థలానికి పెట్రోల్ వాహనాన్ని పంపండి, ట్రాఫిక్‌ను మళ్లించండి మరియు అంబులెన్స్‌ల కోసం గ్రీన్ కారిడార్‌ను ఏర్పాటు చేయండి."
-                checklist = ["100 మీటర్ల భద్రతా సరిహద్దును ఏర్పాటు చేయండి.", "రహదారిపై ట్రాఫిక్ మళ్లింపు బోర్డులను ఉంచండి.", "అత్యవసర వాహనాల రాకపోకలను సులభతరం చేయండి."]
-            elif role == "FIRE":
-                summary = f"{emergency_type} కొరకు ఫైర్ అండ్ రెస్క్యూ ఎక్స్ట్రికేషన్ అలర్ట్ (ప్రాధాన్యత {priority_score}/100)."
-                recommendation = "హైడ్రాలిక్ కట్టర్లతో రెస్క్యూ టెండర్‌ను పంపండి, అగ్ని ప్రమాద హెచ్చరిక ప్రాంతాన్ని గుర్తించండి."
-                checklist = ["రెస్క్యూ టెండర్‌ను తగినంత నీరు మరియు ఫోమ్‌తో సిద్ధం చేయండి.", "వాహనంలో చిక్కుకున్న వారిని సురక్షితంగా రక్షించండి.", "బ్యాటరీలను డిస్‌కనెక్ట్ చేసి అగ్నిప్రమాదాన్ని నివారించండి."]
-            else:
-                summary = f"{emergency_type} కొరకు కంట్రోల్ రూమ్ అలర్ట్."
-                recommendation = "అన్ని విభాగాలు సమన్వయంతో స్పందించాలని ఆదేశించబడింది."
-                checklist = ["సమగ్ర వివరాలను నమోదు చేయండి.", "క్షేత్రస్థాయి అధికారులను పర్యవేక్షించండి."]
-
-        elif lang == "hi":
-            if role == "HOSPITAL":
-                summary = f"{emergency_type} के लिए लेवल-1 ट्रॉमा रिस्पांस ({injuries} घायल, प्राथमिकता {priority_score}/100)।"
-                recommendation = "ट्रॉमा रिससिटेशन बे खाली करें, ऑन-ड्यूटी सर्जिकल टीम को अलर्ट करें और एम्बुलेंस के लिए रैंप तैयार रखें।"
-                checklist = [f"{max(1, injuries)} ट्रॉमा आईसीयू बेड आरक्षित करें।", "ब्लड बैंक को ओ-नेगेटिव रक्त तैयार रखने का निर्देश दें।"]
-            elif role == "POLICE":
-                summary = f"{emergency_type} के लिए ट्रैफिक एवं सुरक्षा अलर्ट (प्राथमिकता {priority_score}/100)।"
-                recommendation = "घटनास्थल की घेराबंदी करें, ट्रैफिक डायवर्ट करें और एम्बुलेंस के लिए ग्रीन कॉरिडोर बनाएं।"
-                checklist = ["सुरक्षा घेरा बनाएं।", "आपातकालीन वाहनों के लिए रास्ता खाली रखें।"]
-            elif role == "FIRE":
-                summary = f"{emergency_type} के लिए फायर एवं रेस्क्यू निर्देश (प्राथमिकता {priority_score}/100)।"
-                recommendation = "हाइड्रोलिक कटर से लैस भारी बचाव वाहन तैनात करें और आग बुझाने की तैयारी रखें।"
-                checklist = ["बचाव दल को तुरंत तैनात करें।", "गैस या रासायनिक रिसाव की जांच करें।"]
-            else:
-                summary = f"{emergency_type} के लिए एकीकृत आपातकालीन चेतावनी।"
-                recommendation = "सभी एजेंसियां संयुक्त समन्वय बनाए रखें।"
-                checklist = ["घटनास्थल के निर्देशांक सत्यापित करें।", "अस्पताल और पुलिस को अलर्ट रखें।"]
-
-        elif lang == "ta":
-            if role == "HOSPITAL":
-                summary = f"{emergency_type} நிகழ்விற்கான அவசர சிகிச்சை எச்சரிக்கை ({injuries} காயமடைந்தவர்கள், முன்னுரிமை {priority_score}/100)."
-                recommendation = "அதிதீவிர சிகிச்சை பிரிவை தயார் செய்யவும், அறுவை சிகிச்சை மருத்துவக் குழுவை எச்சரிக்கவும்."
-                checklist = [f"{max(1, injuries)} அவசர சிகிச்சை படுக்கைகளை தயார் செய்யவும்.", "இரத்த வங்கியை தயார் நிலையில் வைக்கவும்."]
-            elif role == "POLICE":
-                summary = f"{emergency_type} நிகழ்விற்கான போக்குவரத்து ஒழுங்குபடுத்தல் எச்சரிக்கை (முன்னுரிமை {priority_score}/100)."
-                recommendation = "விபத்து பகுதியை சுற்றி பாதுகாப்பு வளையம் அமைத்து ஆம்புலன்ஸுக்கு வழி விடவும்."
-                checklist = ["போக்குவரத்தை மாற்று வழியில் திருப்பிவிடவும்.", "ஆம்புலன்ஸ் செல்ல பாதை அமைக்கவும்."]
-            elif role == "FIRE":
-                summary = f"{emergency_type} மீட்பு மற்றும் தீயணைப்பு எச்சரிக்கை (முன்னுரிமை {priority_score}/100)."
-                recommendation = "மீட்பு வாகனங்களை அனுப்பி பாதிக்கப்பட்டவர்களை மீட்கவும்."
-                checklist = ["நீரியல் கட்டர்களை தயார் நிலையில் வைக்கவும்.", "தீ விபத்து ஏற்படாமல் தடுக்கவும்."]
-            else:
-                summary = f"{emergency_type} ஒருங்கிணைந்த அவசர எச்சரிக்கை."
-                recommendation = "அனைத்து துறைகளும் இணைந்து செயலாற்றவும்."
-                checklist = ["அனைத்து தரவுகளையும் உறுதிப்படுத்தவும்."]
-
-        elif lang == "kn":
-            if role == "HOSPITAL":
-                summary = f"{emergency_type} ಗಾಗಿ ತುರ್ತು ಆಸ್ಪತ್ರೆ ಪ್ರತಿಕ್ರಿಯೆ ({injuries} ಗಾಯಾಳುಗಳು, ಆದ್ಯತೆ {priority_score}/100)."
-                recommendation = "ತುರ್ತು ಚಿಕಿತ್ಸಾ ಕೊಠಡಿಯನ್ನು ಸಿದ್ಧಪಡಿಸಿ, ವೈದ್ಯರನ್ನು ನಿಯೋಜಿಸಿ."
-                checklist = [f"{max(1, injuries)} ಹಾಸಿಗೆಗಳನ್ನು ಕಾಯ್ದಿರಿಸಿ.", "ರಕ್ತನಿಧಿಯನ್ನು ಸಿದ್ಧವಾಗಿಡಿ."]
-            elif role == "POLICE":
-                summary = f"{emergency_type} ಗಾಗಿ ಸಂಚಾರ ನಿಯಂತ್ರಣ ಮತ್ತು ರಕ್ಷಣೆ (ಆದ್ಯತೆ {priority_score}/100)."
-                recommendation = "ಸ್ಥಳದಲ್ಲಿ ಭದ್ರತೆ ಕಲ್ಪಿಸಿ, ಸಂಚಾರ ಮಾರ್ಗ ಬದಲಾಯಿಸಿ."
-                checklist = ["ಆಂಬ್ಯುಲೆನ್ಸ್‌ಗೆ ಮುಕ್ತ ಮಾರ್ಗ ಕಲ್ಪಿಸಿ.", "ಜನಸಂದಣಿ ನಿಯಂತ್ರಿಸಿ."]
-            elif role == "FIRE":
-                summary = f"{emergency_type} ಗಾಗಿ ಅಗ್ನಿಶಾಮಕ ಮತ್ತು ರಕ್ಷಣಾ ಕಾರ್ಯ (ಆದ್ಯತೆ {priority_score}/100)."
-                recommendation = "ರಕ್ಷಣಾ ವಾಹನಗಳನ್ನು ನಿಯೋಜಿಸಿ, ಸಿಲುಕಿರುವವರನ್ನು ರಕ್ಷಿಸಿ."
-                checklist = ["ಬೆಂಕಿ ನಂದಿಸುವ ಸಾಧನಗಳನ್ನು ಸಿದ್ಧವಾಗಿಡಿ."]
-            else:
-                summary = f"{emergency_type} ತುರ್ತು ಎಚ್ಚರಿಕೆ."
-                recommendation = "ಸಂಯೋಜಿತ ಕಾರ್ಯಾಚರಣೆ ಮುಂದುವರಿಸಿ."
-                checklist = ["ವರದಿ ಪರಿಶೀಲಿಸಿ."]
-
-        elif lang == "ml":
-            if role == "HOSPITAL":
-                summary = f"{emergency_type} അത്യാഹിത വിഭാഗം ജാഗ്രതാനിർദ്ദേശം ({injuries} പരിക്കേറ്റവർ, മുൻഗണന {priority_score}/100)."
-                recommendation = "ട്രോമ കെയർ യൂണിറ്റ് സജ്ജമാക്കുക, സർജിക്കൽ സംഘത്തെ വിവരമറിയിക്കുക."
-                checklist = [f"{max(1, injuries)} ഐസിയു കിടക്കകൾ മാറ്റിവെക്കുക."]
-            elif role == "POLICE":
-                summary = f"{emergency_type} ഗതാഗത നിയന്ത്രണ നിർദ്ദേശം (മുൻഗണന {priority_score}/100)."
-                recommendation = "സുരക്ഷാ വലയം തീർക്കുക, ആംബുലൻസുകൾക്ക് വഴി സുഗമമാക്കുക."
-                checklist = ["ട്രാഫിക് വഴിതിരിച്ചുവിടുക."]
-            else:
-                summary = f"{emergency_type} അഗ്നിശമന സേനാ വിഭാഗം അലേർട്ട്."
-                recommendation = "രക്ഷാപ്രവർത്തനങ്ങൾ ഉടൻ ആരംഭിക്കുക."
-                checklist = ["സുരക്ഷാ മുൻകരുതലുകൾ സ്വീകരിക്കുക."]
-
-        else:  # English
-            if role == "HOSPITAL":
-                summary = f"Level-1 trauma response for {emergency_type} with {injuries} reported injuries and priority {priority_score}/100."
-                recommendation = "Clear trauma resuscitation bay, alert on-duty trauma surgical team, and prepare receiving ramp for incoming ALS units."
-                checklist = [
-                    f"Reserve {max(1, injuries)} trauma resuscitation bay(s) with suction and airway management.",
-                    "Notify Alpha Surgical Team and Orthopedic on-call specialists.",
-                    "Prepare blood bank type O-negative cross-match protocol.",
-                ]
-            elif role == "POLICE":
-                summary = f"Corridor security and traffic dispatch for {emergency_type} at priority {priority_score}/100."
-                recommendation = "Dispatch patrol unit to secure incident perimeter, stage traffic diversions upstream, and preserve emergency corridor for EMS."
-                checklist = [
-                    "Deploy patrol unit to establish outer safety cordon 100 meters upstream.",
-                    "Place traffic cones and divert arterial lanes away from the impact site.",
-                    "Preserve active lane for incoming ambulance and fire tenders.",
-                ]
-            elif role == "FIRE":
-                summary = f"Tactical rescue & hazard suppression for {emergency_type} at priority {priority_score}/100."
-                recommendation = "Deploy Heavy Rescue Tender with hydraulic extrication gear, establish 360-degree hazard perimeter, and scan for hazardous materials."
-                checklist = [
-                    "Stage rescue tender upwind with water and AFFF foam readiness.",
-                    "Deploy hydraulic cutters and spreaders for casualty extrication if trapped.",
-                    "Disconnect vehicle batteries to prevent electrical ignition.",
-                ]
-            else:
-                summary = f"Multi-agency operational alert for {emergency_type}."
-                recommendation = "Maintain unified command and coordinate resource deployment."
-                checklist = ["Verify incident coordinates", "Confirm casualty counts", "Synchronize dispatch timeline"]
+        # Control rooms strictly receive professional English directives
+        if role == "HOSPITAL":
+            summary = f"Level-1 trauma response for {emergency_type} with {injuries} reported injuries and priority {priority_score}/100."
+            recommendation = "Clear trauma resuscitation bay, alert on-duty trauma surgical team, and prepare receiving ramp for incoming ALS units."
+            checklist = [
+                f"Reserve {max(1, injuries)} trauma resuscitation bay(s) with suction and airway management.",
+                "Notify Alpha Surgical Team and Orthopedic on-call specialists.",
+                "Prepare blood bank type O-negative cross-match protocol.",
+                "Verify ventilator and monitor availability in trauma ICU.",
+            ]
+        elif role == "POLICE":
+            summary = f"Corridor security and traffic dispatch for {emergency_type} at priority {priority_score}/100."
+            recommendation = "Dispatch patrol unit to secure incident perimeter, stage traffic diversions upstream, and preserve emergency corridor for EMS."
+            checklist = [
+                "Deploy patrol unit to establish outer safety cordon 100 meters upstream.",
+                "Place traffic cones and divert arterial lanes away from the impact site.",
+                "Preserve active lane for incoming ambulance and fire tenders.",
+                "Document scene telemetry and assist triage staging.",
+            ]
+        elif role == "FIRE":
+            summary = f"Tactical rescue & hazard suppression for {emergency_type} at priority {priority_score}/100."
+            recommendation = "Deploy Heavy Rescue Tender with hydraulic extrication gear, establish 360-degree hazard perimeter, and scan for hazardous materials."
+            checklist = [
+                "Stage rescue tender upwind with water and AFFF foam readiness.",
+                "Deploy hydraulic cutters and spreaders for casualty extrication if trapped.",
+                "Disconnect vehicle batteries to prevent electrical ignition.",
+                "Establish isolation perimeter and verify structural stability.",
+            ]
+        else:
+            summary = f"Multi-agency operational alert for {emergency_type} at priority {priority_score}/100."
+            recommendation = "Maintain unified incident command and coordinate cross-agency resource deployment."
+            checklist = [
+                "Verify incident coordinates and triage status.",
+                "Confirm casualty counts and staging locations.",
+                "Synchronize CAD dispatch timeline across Police, Fire, and EMS.",
+            ]
 
         return {
             "summary": summary,
             "recommendation": recommendation,
             "operational_checklist": checklist,
+            "language": "en",
         }
+

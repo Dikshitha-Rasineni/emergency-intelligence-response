@@ -57,6 +57,8 @@ class IncidentResponse(BaseModel):
     updated_at: datetime
     precautions: Optional[List[str]] = None
     recommendations: Optional[dict] = None
+    english_description: Optional[str] = None
+    dispatch_summary_en: Optional[str] = None
 
     model_config = {"from_attributes": True}
 

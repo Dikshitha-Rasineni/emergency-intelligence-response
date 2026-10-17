@@ -101,6 +101,58 @@ def test_multilingual_detection_and_guidance():
         assert data["priority_score"] >= 60  # Critical casualty detected in native language
         assert data["precautions"] is not None and len(data["precautions"]) > 0
 
+        # Control rooms must receive strictly English output
+        rec = data.get("recommendations")
+        assert rec is not None
+        assert "summary" in rec and len(rec["summary"]) > 0
+        assert "recommendation" in rec and len(rec["recommendation"]) > 0
+        # Verify no Indic script in control room recommendation summary
+        assert not any(ord(char) > 127 for char in rec["summary"])
+        assert data.get("english_description") is not None
+        assert "CAD Dispatch" in data["english_description"] or "Emergency" in data["english_description"]
+
+
+def test_control_rooms_strictly_english_output():
+    """
+    Test 5: Explicit verification that Hospital, Police, Fire, and CAD control rooms
+    strictly receive 100% English operational intelligence regardless of citizen input language.
+    """
+    indic_prompts = [
+        ("te", "రోడ్డు ప్రమాదం జరిగింది. ఇద్దరు వ్యక్తులు గాయపడ్డారు."),
+        ("ta", "தீ விபத்து ஏற்பட்டுள்ளது. உடனடியாக உதவி தேவை."),
+        ("hi", "गाड़ी में आग लग गई है। तीन लोग फंसे हुए हैं।"),
+        ("kn", "ನೀರಿನಲ್ಲಿ ಕಾರು ಮುಳುಗಿದೆ. ದಯವಿಟ್ಟು ರಕ್ಷಿಸಿ."),
+        ("ml", "ഗുരുതരമായ റോഡ് അപകടം. അടിയന്തര സഹായം വേണം.")
+    ]
+
+    roles = ["HOSPITAL", "POLICE", "FIRE"]
+
+    for lang, prompt in indic_prompts:
+        for role in roles:
+            role_intel = client.post("/api/v1/ai/response", json={
+                "role": role,
+                "emergency_type": "Major Emergency",
+                "description": prompt,
+                "affected_people": 2,
+                "injuries": 1,
+                "critical_indicators": ["Urgent response required"],
+                "priority_score": 80,
+                "language": lang
+            })
+            assert role_intel.status_code == 200
+            intel = role_intel.json()
+            assert intel["language"] == "en"
+
+            # Verify summary and recommendations are strictly standard ASCII English
+            summary = intel["summary"]
+            recommendation = intel["recommendation"]
+            checklist = intel["operational_checklist"]
+
+            assert all(ord(c) < 128 for c in summary), f"Non-ASCII found in {role} summary for {lang}: {summary}"
+            assert all(ord(c) < 128 for c in recommendation), f"Non-ASCII found in {role} recommendation for {lang}: {recommendation}"
+            for item in checklist:
+                assert all(ord(c) < 128 for c in item), f"Non-ASCII found in {role} checklist for {lang}: {item}"
+
 
 def test_geospatial_resource_discovery_and_clinic_distinction():
     """
@@ -131,3 +183,4 @@ def test_geospatial_resource_discovery_and_clinic_distinction():
         assert "eta_min" in r or "eta_minutes" in r
         if r["resource_type"] == "CLINIC":
             assert r.get("is_clinic", False) is True
+

@@ -173,15 +173,14 @@ class AIService:
         Generates role-specific operational intelligence for Hospital, Police, or Fire responders.
         """
         role = role.upper()
-        detected_lang = lang or LanguageService.detect_language(description)
-
+        # Control rooms strictly receive English output
         intel = LanguageService.get_role_intelligence(
             role=role,
             emergency_type=emergency_type,
             injuries=injuries,
             affected_people=affected_people,
             priority_score=priority_score,
-            lang=detected_lang,
+            lang="en",
         )
 
         services = ["Trauma Resuscitation Bay", "ICU Bed Reservation", "Blood Bank On-Call", "Ambulance Receiving Bay"] if role == "HOSPITAL" else (
@@ -206,5 +205,6 @@ class AIService:
             traffic_impact="Arterial corridor lane blockage. Upstream traffic slowdown expected." if role == "POLICE" else None,
             casualty_staging=f"Estimated triage volume: {affected_people} individuals ({injuries} acute casualties)." if role == "HOSPITAL" else None,
             tactical_deployments="Upwind operational staging; 30-meter isolation perimeter around hazardous impact point." if role == "FIRE" else None,
-            language=detected_lang,
+            language="en",
         )
+
