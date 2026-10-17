@@ -9,24 +9,43 @@ from app.schemas.ai import (
     PrecautionResponse,
     RoleIntelligenceResponse,
 )
+from app.services.language_service import LanguageService
 
 
 class AIService:
     @classmethod
-    def _call_ollama(cls, system_prompt: str, user_prompt: str, timeout_seconds: float = 4.0) -> Optional[str]:
-        """Queries local Ollama instance with timeout."""
+    def _call_ollama(
+        cls,
+        system_prompt: str,
+        user_prompt: str,
+        timeout_seconds: float = 4.0,
+        lang: str = "en",
+    ) -> Optional[str]:
+        """Queries local Ollama instance with timeout and explicit language enforcement."""
         try:
+            lang_name = LanguageService.LANGUAGE_NAMES.get(lang, "English")
+            full_system_prompt = (
+                f"{system_prompt}\n\n"
+                f"MANDATORY LANGUAGE DIRECTIVE:\n"
+                f"The user report is written in {lang_name} (ISO: '{lang}').\n"
+                f"Respond entirely in the requested output language: {lang_name}.\n"
+                f"Preserve the meaning of the original emergency report.\n"
+                f"Do not switch to English unless English is the requested language.\n"
+                f"Keep names, addresses, phone numbers, coordinates, and system enum identifiers unchanged.\n"
+                f"Return valid JSON only."
+            )
+
             url = f"{settings.OLLAMA_BASE_URL}/api/chat"
             payload = {
                 "model": settings.OLLAMA_MODEL,
                 "messages": [
-                    {"role": "system", "content": system_prompt},
+                    {"role": "system", "content": full_system_prompt},
                     {"role": "user", "content": user_prompt},
                 ],
                 "stream": False,
                 "options": {
                     "temperature": 0.1,
-                    "num_predict": 300,
+                    "num_predict": 350,
                 },
             }
             with httpx.Client(timeout=timeout_seconds) as client:
@@ -39,11 +58,20 @@ class AIService:
         return None
 
     @classmethod
-    def extract_incident_data(cls, text: str, location_hint: str = None) -> AIExtractResponse:
+    def extract_incident_data(
+        cls,
+        text: str,
+        location_hint: str = None,
+        lang: Optional[str] = None,
+    ) -> AIExtractResponse:
         """
         Extracts structured incident attributes from unstructured text.
-        Uses local LLM if responsive; falls back to deterministic NLP regex parser.
+        Supports Telugu, Tamil, Hindi, Kannada, Malayalam, and English.
+        Uses local LLM if responsive; falls back to deterministic multilingual parser.
         """
+        # Auto-detect language if not explicitly provided
+        detected_lang = lang or LanguageService.detect_language(text)
+
         system_prompt = (
             "You are RESQ.AI Emergency Extractor. Extract structured JSON only from the user report.\n"
             "Format: {\"emergency_type\": str, \"affected_people\": int, \"injuries\": int, "
@@ -51,7 +79,11 @@ class AIService:
             "Do not include conversational text or markdown blocks."
         )
 
-        ollama_response = cls._call_ollama(system_prompt, f"Emergency report: {text}")
+        ollama_response = cls._call_ollama(
+            system_prompt,
+            f"Emergency report: {text}",
+            lang=detected_lang,
+        )
         if ollama_response:
             try:
                 # Find JSON block
@@ -66,58 +98,19 @@ class AIService:
                         location_information=parsed.get("location_information") or location_hint,
                         confidence_score=0.92,
                         missing_information=parsed.get("missing_information", []),
+                        language=detected_lang,
                     )
             except Exception as e:
                 logger.debug(f"Could not parse Ollama response: {e}")
 
-        # Deterministic High-Precision Fallback Parser
-        lower = text.lower()
-        emergency_type = "General Emergency"
-        critical_indicators = []
-        injuries = 0
-        affected = 0
+        # Deterministic High-Precision Multilingual Fallback Parser
+        injuries, affected = LanguageService.extract_numbers_and_injuries(text, lang=detected_lang)
+        emergency_type = LanguageService.extract_emergency_type(text, lang=detected_lang)
+        critical_indicators = LanguageService.extract_critical_indicators(text, lang=detected_lang)
+
         missing_info = []
-
-        # Emergency Type Classification
-        if any(w in lower for w in ["accident", "crash", "collision", "overturned", "fender bender"]):
-            emergency_type = "Major Road Accident"
-        elif any(w in lower for w in ["fire", "smoke", "blaze", "burning", "explosion"]):
-            emergency_type = "Commercial Building Fire"
-        elif any(w in lower for w in ["flood", "waterlogging", "submerged", "drowning", "rising water"]):
-            emergency_type = "Urban Flash Flood & Vehicle Stall"
-        elif any(w in lower for w in ["cardiac", "heart attack", "collapsed", "unresponsive", "cpr", "stroke"]):
-            emergency_type = "Cardiac / Acute Medical Crisis"
-
-        # Critical Indicators Detection
-        if "unconscious" in lower:
-            critical_indicators.append("Unconscious casualty reported")
-        if "trapped" in lower or "pinned" in lower:
-            critical_indicators.append("Occupants trapped on scene")
-        if "smoke" in lower or "gas" in lower or "cylinder" in lower:
-            critical_indicators.append("Hazardous smoke or gas cylinder condition")
-        if "cpr" in lower:
-            critical_indicators.append("CPR in progress on scene")
-        if "submerged" in lower or "roof" in lower:
-            critical_indicators.append("Rising flood water / vehicle submerged")
-
-        # Injury Count Extraction
-        inj_match = re.search(r"(\d+|one|two|three|four|five)\s+(?:people\s+)?(?:injured|injuries|casualties|hurt)", lower)
-        num_map = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5}
-        if inj_match:
-            raw_val = inj_match.group(1)
-            injuries = num_map.get(raw_val, int(raw_val) if raw_val.isdigit() else 1)
-        elif "injured" in lower or "injury" in lower:
-            injuries = 1
-
-        # Affected People Count Extraction
-        aff_match = re.search(r"(\d+|one|two|three|four|five)\s+(?:people|persons|passengers|occupants)", lower)
-        if aff_match:
-            raw_val = aff_match.group(1)
-            affected = num_map.get(raw_val, int(raw_val) if raw_val.isdigit() else 1)
-        else:
-            affected = max(injuries, 1 if emergency_type != "General Emergency" else 0)
-
-        if "vehicle" in lower and not any("fuel" in m for m in missing_info):
+        lower = text.lower()
+        if "vehicle" in lower or "వాహనం" in text or "गाड़ी" in text:
             missing_info.append("Vehicle fuel leak status unconfirmed")
         if injuries > 0:
             missing_info.append("Exact age demographics of casualties unconfirmed")
@@ -130,60 +123,38 @@ class AIService:
             location_information=location_hint or "Verified Incident Location",
             confidence_score=0.95,
             missing_information=missing_info,
+            language=detected_lang,
         )
 
     @classmethod
-    def generate_precautions(cls, emergency_type: str, description: str = "", priority: int = 50) -> PrecautionResponse:
+    def generate_precautions(
+        cls,
+        emergency_type: str,
+        description: str = "",
+        priority: int = 50,
+        lang: Optional[str] = None,
+    ) -> PrecautionResponse:
         """
-        Generates role-appropriate, non-diagnostic public safety precautions.
+        Generates role-appropriate, non-diagnostic public safety precautions in the requested language.
         """
-        type_lower = emergency_type.lower()
-        desc_lower = description.lower()
+        detected_lang = lang or LanguageService.detect_language(description)
 
-        if "fire" in type_lower or "smoke" in desc_lower:
-            precautions = [
-                "Crawl low under smoke — clean breathable air remains within 1 foot of the floor.",
-                "Do NOT use elevators under any circumstances; use external fire exit stairwells.",
-                "Close internal doors behind you as you evacuate to compartmentalize fire spread.",
-                "Move across the street to an upwind assembly point away from glass facades.",
-                "If clothes catch fire: Stop, Drop, and Roll immediately.",
-            ]
-        elif "flood" in type_lower or "water" in desc_lower:
-            precautions = [
-                "Do NOT attempt to walk, wade, or drive through flowing flood waters.",
-                "Beware of hidden open manholes and live electrical cables in submerged areas.",
-                "Stay on stable rooftop or elevated ground until emergency rescue teams arrive.",
-                "Signal with bright cloth or flashlight if visibility is reduced.",
-                "Do not drink tap water from submerged piping.",
-            ]
-        elif "cardiac" in type_lower or "cpr" in desc_lower:
-            precautions = [
-                "Continue uninterrupted chest compressions at 100–120 beats per minute until paramedics arrive.",
-                "Push hard and fast in the center of the chest (at least 2 inches deep).",
-                "Send a bystander immediately to locate the nearest Automated External Defibrillator (AED).",
-                "Keep entry doors and elevator bays unlocked and clear for ambulance crew access.",
-                "Do not attempt to administer oral liquids or food.",
-            ]
-        elif "accident" in type_lower or "crash" in desc_lower:
-            precautions = [
-                "Do NOT move injured casualties unless there is immediate risk of fire or vehicle explosion.",
-                "Stay safely behind the highway crash barrier away from moving corridor traffic.",
-                "Turn on vehicle hazard flashers and place emergency warning triangles 50m upstream if safe.",
-                "Keep the emergency breakdown shoulder completely clear for incoming ALS ambulances.",
-                "Avoid touching exposed electrical wiring or leaking vehicle fluids.",
-            ]
-        else:
-            precautions = [
-                "Stay calm and remain in a secure, visible location.",
-                "Keep phone lines open for responder dispatch coordination.",
-                "Do not touch hazardous objects or fluids on scene.",
-                "Follow verified instructions from official emergency personnel upon arrival.",
-            ]
+        precautions = LanguageService.get_precautions(emergency_type, lang=detected_lang)
+
+        disclaimer_map = {
+            "en": "AI Recommended Precautions — public safety guidance only. Not a medical diagnosis.",
+            "te": "AI సిఫార్సు చేసిన జాగ్రత్తలు — ప్రజా భద్రతా మార్గదర్శకాలు మాత్రమే. వైద్య నిర్ధారణ కాదు.",
+            "ta": "AI பரிந்துரைத்த முன்னெச்சரிக்கைகள் — பொதுப் பாதுகாப்பு வழிகாட்டுதல் மட்டுமே. மருத்துவக் கண்டறிதல் அல்ல.",
+            "hi": "AI अनुशंसित सावधानियां — केवल सार्वजनिक सुरक्षा मार्गदर्शन। चिकित्सीय निदान नहीं।",
+            "kn": "AI ಶಿಫಾರಸು ಮಾಡಿದ ಮುನ್ನೆಚ್ಚರಿಕೆಗಳು — ಸಾರ್ವಜನಿಕ ಸುರಕ್ಷತಾ ಮಾರ್ಗದರ್ಶನ ಮಾತ್ರ. ವೈದ್ಯಕೀಯ ರೋಗನಿರ್ಣಯವಲ್ಲ.",
+            "ml": "AI ശുപാർശ ചെയ്ത മുൻകരുതലുകൾ — പൊതുജന സുരക്ഷാ മാർഗ്ഗനിർദ്ദേശം മാത്രം. മെഡിക്കൽ രോഗനിർണയമല്ല.",
+        }
 
         return PrecautionResponse(
             emergency_type=emergency_type,
             precautions=precautions,
-            disclaimer="AI Recommended Precautions — public safety guidance only. Not a medical diagnosis.",
+            disclaimer=disclaimer_map.get(detected_lang, disclaimer_map["en"]),
+            language=detected_lang,
         )
 
     @classmethod
@@ -196,78 +167,44 @@ class AIService:
         injuries: int,
         critical_indicators: List[str],
         priority_score: int,
+        lang: Optional[str] = None,
     ) -> RoleIntelligenceResponse:
         """
         Generates role-specific operational intelligence for Hospital, Police, or Fire responders.
         """
         role = role.upper()
-        type_lower = emergency_type.lower()
-        desc_lower = description.lower()
+        detected_lang = lang or LanguageService.detect_language(description)
 
-        if role == "HOSPITAL":
-            summary = f"Level-1 trauma response for {emergency_type} with {injuries} reported injuries and priority {priority_score}/100."
-            recommendation = "Clear trauma resuscitation bay, alert on-duty trauma surgical team, and prepare receiving ramp for incoming ALS units."
-            checklist = [
-                f"Reserve {max(1, injuries)} trauma resuscitation bay(s) with suction and airway management.",
-                "Notify Alpha Surgical Team and Orthopedic on-call specialists.",
-                "Prepare blood bank type O-negative cross-match protocol.",
-                "Ensure emergency bay transit doors are cleared for ambulance docking.",
-            ]
-            services = ["Trauma Resuscitation Bay", "ICU Bed Reservation", "Blood Bank On-Call", "Ambulance Receiving Bay"]
-            equipment = ["Airway kit with video laryngoscope", "Defibrillator", "Rapid IV Infuser", "Cervical collar sets"]
-            casualty_staging = f"Estimated triage volume: {affected_people} individuals ({injuries} acute casualties)."
-            traffic_impact = None
-            tactical = None
+        intel = LanguageService.get_role_intelligence(
+            role=role,
+            emergency_type=emergency_type,
+            injuries=injuries,
+            affected_people=affected_people,
+            priority_score=priority_score,
+            lang=detected_lang,
+        )
 
-        elif role == "POLICE":
-            summary = f"Corridor security and traffic dispatch for {emergency_type} at priority {priority_score}/100."
-            recommendation = "Dispatch Patrol-14 to secure incident perimeter, stage traffic diversions upstream, and preserve emergency corridor for EMS."
-            checklist = [
-                "Deploy patrol unit to establish outer safety cordon 100 meters upstream.",
-                "Place traffic cones and divert arterial lanes away from the impact site.",
-                "Preserve active lane for incoming ambulance and fire tenders.",
-                "Record vehicle registration numbers and witness contact details.",
-            ]
-            services = ["Patrol Unit Perimeter", "Traffic Corridor Clearance", "Crowd Control", "CAD Log Synchronization"]
-            equipment = ["High-visibility LED cones", "Road barricade units", "Body cameras", "Corridor flare markers"]
-            traffic_impact = "Arterial corridor lane blockage. Upstream traffic slowdown expected within 1.5 km."
-            casualty_staging = None
-            tactical = None
-
-        elif role == "FIRE":
-            summary = f"Tactical rescue & hazard suppression for {emergency_type} at priority {priority_score}/100."
-            recommendation = "Deploy Heavy Rescue Tender HR-04 with hydraulic extrication gear, establish 360-degree hazard perimeter, and scan for hazardous materials."
-            checklist = [
-                "Stage HR-04 tender 30m upwind with 4,500L water and AFFF foam readiness.",
-                "Deploy hydraulic cutters and spreaders for casualty extrication if trapped.",
-                "Disconnect 12V/high-voltage vehicle batteries to prevent electrical ignition.",
-                "Perform gas/thermal imaging scan for structural hot spots or cylinder leaks.",
-            ]
-            services = ["Heavy Rescue Extrication", "Structural Suppression", "Thermal Reconnaissance", "Hazmat Isolation"]
-            equipment = ["Hydraulic Cutter / Spreader Kit", "SCBA Breathing Apparatus", "AFFF Foam Nozzle", "Thermal Imaging Camera"]
-            tactical = "Upwind operational staging; 30-meter isolation perimeter around hazardous impact point."
-            casualty_staging = None
-            traffic_impact = None
-
-        else:
-            summary = f"Multi-agency operational alert for {emergency_type}."
-            recommendation = "Maintain unified command and coordinate resource deployment."
-            checklist = ["Verify incident coordinates", "Confirm casualty counts", "Synchronize dispatch timeline"]
-            services = ["Dispatch Command"]
-            equipment = ["CAD Terminal"]
-            traffic_impact = None
-            casualty_staging = None
-            tactical = None
+        services = ["Trauma Resuscitation Bay", "ICU Bed Reservation", "Blood Bank On-Call", "Ambulance Receiving Bay"] if role == "HOSPITAL" else (
+            ["Patrol Unit Perimeter", "Traffic Corridor Clearance", "Crowd Control", "CAD Log Synchronization"] if role == "POLICE" else (
+                ["Heavy Rescue Extrication", "Structural Suppression", "Thermal Reconnaissance", "Hazmat Isolation"] if role == "FIRE" else ["Dispatch Command"]
+            )
+        )
+        equipment = ["Airway kit with video laryngoscope", "Defibrillator", "Rapid IV Infuser"] if role == "HOSPITAL" else (
+            ["High-visibility LED cones", "Road barricade units", "Body cameras"] if role == "POLICE" else (
+                ["Hydraulic Cutter / Spreader Kit", "SCBA Breathing Apparatus", "AFFF Foam Nozzle"] if role == "FIRE" else ["CAD Terminal"]
+            )
+        )
 
         return RoleIntelligenceResponse(
             role=role,
-            summary=summary,
-            recommendation=recommendation,
-            operational_checklist=checklist,
+            summary=intel["summary"],
+            recommendation=intel["recommendation"],
+            operational_checklist=intel["operational_checklist"],
             required_services=services,
             required_equipment=equipment,
             missing_information=["Scene ambient hazards confirmation", "Secondary impact confirmation"],
-            traffic_impact=traffic_impact,
-            casualty_staging=casualty_staging,
-            tactical_deployments=tactical,
+            traffic_impact="Arterial corridor lane blockage. Upstream traffic slowdown expected." if role == "POLICE" else None,
+            casualty_staging=f"Estimated triage volume: {affected_people} individuals ({injuries} acute casualties)." if role == "HOSPITAL" else None,
+            tactical_deployments="Upwind operational staging; 30-meter isolation perimeter around hazardous impact point." if role == "FIRE" else None,
+            language=detected_lang,
         )

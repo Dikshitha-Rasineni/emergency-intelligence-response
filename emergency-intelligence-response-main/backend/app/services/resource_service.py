@@ -1,13 +1,21 @@
 from typing import List, Optional
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from app.models.resource import EmergencyResource, ResourceAvailability
 from app.schemas.resource import ResourceResponse
 from app.services.routing_service import RoutingService
+from app.services.geospatial_discovery_service import GeospatialDiscoveryService
 
 
 class ResourceService:
     @staticmethod
-    def _format_resource(res: EmergencyResource, distance_km: float = None, eta_min: int = None, score: float = None, ranking: int = None) -> ResourceResponse:
+    def _format_resource(
+        res: EmergencyResource,
+        distance_km: float = None,
+        eta_min: int = None,
+        score: float = None,
+        ranking: int = None,
+    ) -> ResourceResponse:
         avail_str = "Unavailable"
         avail_units = 0
         wait_time = 0
@@ -17,7 +25,7 @@ class ResourceService:
             avail_units = res.availability.available_units
             wait_time = res.availability.wait_time
             details = res.availability.operational_details or {}
-            
+
             # Format human-readable availability
             if res.resource_type == "HOSPITAL":
                 avail_str = details.get("emergency_dept", f"{avail_units} Beds Available" if res.availability.status == "AVAILABLE" else "Busy")
@@ -39,12 +47,13 @@ class ResourceService:
             name=res.name,
             type=res.resource_type,
             resource_type=res.resource_type,
+            category=res.resource_type,
             latitude=res.latitude,
             longitude=res.longitude,
             lat=res.latitude,
             lng=res.longitude,
             address=res.address,
-            phone=res.phone,
+            phone=res.phone or "Not Listed (Dial 112)",
             contact=res.phone or "112",
             capabilities=res.capabilities or [],
             capability=cap_summary,
@@ -56,6 +65,10 @@ class ResourceService:
             suitability_score=score,
             ranking=ranking,
             operational_details=details,
+            provider="RESQ.AI Verified Station Database",
+            retrieved_at=datetime.now(timezone.utc).isoformat(),
+            navigation_url=f"https://www.google.com/maps/dir/?api=1&destination={res.latitude},{res.longitude}",
+            verified=True,
         )
 
     @classmethod
@@ -68,26 +81,75 @@ class ResourceService:
         max_radius_km: float = 25.0,
     ) -> List[ResourceResponse]:
         """
-        Discovers verified nearby emergency resources from the database within radius.
+        Discovers verified nearby emergency resources within radius.
         """
-        query = db.query(EmergencyResource)
-        if resource_type:
-            query = query.filter(EmergencyResource.resource_type == resource_type.upper())
+        if latitude is None or longitude is None:
+            return []
 
-        all_res = query.all()
         results: List[ResourceResponse] = []
+        seen_keys = set()
 
-        for r in all_res:
-            crow_km = RoutingService.haversine_distance_km(latitude, longitude, r.latitude, r.longitude)
-            road_km = round(crow_km * 1.25, 1)
+        # 1. Query Database Resources
+        if db:
+            query = db.query(EmergencyResource)
+            if resource_type and resource_type.upper() != "ALL":
+                query = query.filter(EmergencyResource.resource_type == resource_type.upper())
 
-            if road_km <= max_radius_km:
-                eta_min = max(2, int(round((road_km / 40.0) * 60.0 + 1)))
-                formatted = cls._format_resource(r, distance_km=road_km, eta_min=eta_min)
-                results.append(formatted)
+            all_res = query.all()
+            for r in all_res:
+                crow_km = RoutingService.haversine_distance_km(latitude, longitude, r.latitude, r.longitude)
+                road_km = round(crow_km * 1.25, 1)
 
-        # Sort by distance
-        results.sort(key=lambda x: x.distance_km or 999.0)
+                if road_km <= max_radius_km:
+                    eta_min = max(2, int(round((road_km / 40.0) * 60.0 + 1)))
+                    formatted = cls._format_resource(r, distance_km=road_km, eta_min=eta_min)
+                    results.append(formatted)
+                    seen_keys.add((round(r.latitude, 3), round(r.longitude, 3)))
+
+        # 2. Query Real-World OpenStreetMap Overpass Provider
+        try:
+            osm_resources = GeospatialDiscoveryService.search_nearby_resources(
+                latitude=latitude,
+                longitude=longitude,
+                resource_type=resource_type,
+                radius_km=max_radius_km,
+            )
+            for item in osm_resources:
+                coord_key = (round(item["latitude"], 3), round(item["longitude"], 3))
+                if coord_key not in seen_keys:
+                    seen_keys.add(coord_key)
+                    results.append(ResourceResponse(
+                        id=item["id"],
+                        resource_id=item["resource_id"],
+                        name=item["name"],
+                        type=item["type"],
+                        resource_type=item["resource_type"],
+                        category=item.get("category", item["type"]),
+                        latitude=item["latitude"],
+                        longitude=item["longitude"],
+                        lat=item["latitude"],
+                        lng=item["longitude"],
+                        address=item.get("address"),
+                        phone=item.get("phone", "Not Listed"),
+                        contact=item.get("contact", "112"),
+                        capabilities=item.get("capabilities", []),
+                        capability=item.get("capability", "Verified Emergency Facility"),
+                        availability=item.get("availability", "Active Facility Listing"),
+                        available_units=item.get("available_units", 0),
+                        wait_time=0,
+                        distance_km=item.get("distance_km"),
+                        eta_min=item.get("eta_min"),
+                        provider=item.get("provider", "OpenStreetMap Overpass API"),
+                        retrieved_at=item.get("retrieved_at"),
+                        navigation_url=item.get("navigation_url"),
+                        verified=True,
+                    ))
+        except Exception as e:
+            # Continue gracefully with DB results on network/provider error
+            pass
+
+        # Sort strictly by distance
+        results.sort(key=lambda x: x.distance_km if x.distance_km is not None else 999.0)
         return results
 
     @classmethod
@@ -107,6 +169,9 @@ class ResourceService:
         - Real availability & capacity (30%)
         - Capability suitability to emergency type (30%)
         """
+        if latitude is None or longitude is None:
+            return []
+
         nearby = cls.get_nearby_resources(db, latitude, longitude, max_radius_km=max_radius_km)
         type_lower = emergency_type.lower()
 
@@ -117,34 +182,34 @@ class ResourceService:
             dist_score = max(0.0, 100.0 - (dist / 25.0) * 100.0)
 
             # 2. Availability score
-            avail_score = 100.0 if "Available" in r.availability or "Ready" in r.availability else 40.0
+            avail_score = 100.0 if "Available" in r.availability or "Ready" in r.availability else 60.0
             if r.available_units > 1:
                 avail_score = min(100.0, avail_score + 10.0)
 
             # 3. Domain suitability score
             suitability = 50.0
-            if "accident" in type_lower or "crash" in type_lower:
+            if "accident" in type_lower or "crash" in type_lower or "రోడ్డు ప్రమాదం" in type_lower:
                 if r.type in ["HOSPITAL", "AMBULANCE"]:
                     suitability = 95.0
                 elif r.type == "POLICE":
                     suitability = 90.0
                 elif r.type == "FIRE":
                     suitability = 70.0
-            elif "fire" in type_lower or "smoke" in type_lower:
+            elif "fire" in type_lower or "smoke" in type_lower or "మంటలు" in type_lower:
                 if r.type == "FIRE":
                     suitability = 100.0
                 elif r.type in ["AMBULANCE", "HOSPITAL"]:
                     suitability = 85.0
                 elif r.type == "POLICE":
                     suitability = 80.0
-            elif "flood" in type_lower or "water" in type_lower:
+            elif "flood" in type_lower or "water" in type_lower or "వరద" in type_lower:
                 if r.type == "FIRE":
                     suitability = 95.0
                 elif r.type == "POLICE":
                     suitability = 85.0
                 else:
                     suitability = 60.0
-            elif "cardiac" in type_lower or "medical" in type_lower:
+            elif "cardiac" in type_lower or "medical" in type_lower or "గుండెపోటు" in type_lower:
                 if r.type in ["AMBULANCE", "HOSPITAL"]:
                     suitability = 100.0
                 else:

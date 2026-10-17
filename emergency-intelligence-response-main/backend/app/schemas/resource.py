@@ -27,11 +27,16 @@ class ResourceResponse(BaseModel):
     availability: str  # e.g. "Available" or "Emergency Department Available"
     available_units: int
     wait_time: int
+    category: Optional[str] = None  # HOSPITAL, CLINIC, POLICE, FIRE, AMBULANCE
     distance_km: Optional[float] = None
     eta_min: Optional[int] = None
     suitability_score: Optional[float] = None
     ranking: Optional[int] = None
     operational_details: Optional[Dict[str, Any]] = None
+    provider: Optional[str] = "RESQ.AI Verified Station Database"
+    retrieved_at: Optional[str] = None
+    navigation_url: Optional[str] = None
+    verified: Optional[bool] = True
 
     model_config = {"from_attributes": True}
 

@@ -43,24 +43,12 @@ def get_incident(incident_id: str, db: Session = Depends(get_db)):
 @router.patch("/incidents/{incident_id}", response_model=IncidentResponse)
 def update_incident(incident_id: str, update_data: IncidentUpdate, db: Session = Depends(get_db)):
     """
-    Updates incident status, casualty counts, or user priority.
+    Updates incident location, description, status, casualty counts, or user priority.
     """
-    report = db.query(EmergencyReport).filter(EmergencyReport.id == incident_id).first()
-    if not report:
+    updated = IncidentService.update_incident(db, incident_id, update_data)
+    if not updated:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Incident with ID '{incident_id}' not found.",
         )
-
-    if update_data.status:
-        report.status = update_data.status
-    if update_data.affected_people is not None:
-        report.affected_people = update_data.affected_people
-    if update_data.injuries is not None:
-        report.injuries = update_data.injuries
-    if update_data.description:
-        report.description = update_data.description
-
-    db.commit()
-    db.refresh(report)
-    return IncidentService._to_response(report)
+    return updated

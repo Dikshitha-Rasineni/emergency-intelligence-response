@@ -5,6 +5,7 @@ from typing import List, Optional, Dict, Any
 class AIExtractRequest(BaseModel):
     description: str = Field(..., min_length=5)
     location_hint: Optional[str] = None
+    language: Optional[str] = None
 
 
 class AIExtractResponse(BaseModel):
@@ -15,18 +16,21 @@ class AIExtractResponse(BaseModel):
     location_information: Optional[str] = None
     confidence_score: float = 0.95
     missing_information: List[str] = Field(default_factory=list)
+    language: Optional[str] = "en"
 
 
 class PrecautionRequest(BaseModel):
     emergency_type: str
     description: Optional[str] = None
     priority_score: Optional[int] = None
+    language: Optional[str] = None
 
 
 class PrecautionResponse(BaseModel):
     emergency_type: str
     precautions: List[str]
     disclaimer: str = "AI Recommended Precautions — public safety guidelines only. Not a medical diagnosis."
+    language: Optional[str] = "en"
 
 
 class RoleIntelligenceRequest(BaseModel):
@@ -38,6 +42,7 @@ class RoleIntelligenceRequest(BaseModel):
     injuries: int
     critical_indicators: List[str]
     priority_score: int
+    language: Optional[str] = None
 
 
 class RoleIntelligenceResponse(BaseModel):
@@ -51,3 +56,4 @@ class RoleIntelligenceResponse(BaseModel):
     traffic_impact: Optional[str] = None
     casualty_staging: Optional[str] = None
     tactical_deployments: Optional[str] = None
+    language: Optional[str] = "en"

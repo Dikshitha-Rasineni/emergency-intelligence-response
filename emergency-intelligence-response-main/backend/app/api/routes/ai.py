@@ -17,7 +17,11 @@ def extract_incident_features(request: AIExtractRequest):
     """
     Extracts structured emergency features from unstructured citizen text.
     """
-    return AIService.extract_incident_data(request.description, location_hint=request.location_hint)
+    return AIService.extract_incident_data(
+        request.description,
+        location_hint=request.location_hint,
+        lang=request.language,
+    )
 
 
 @router.post("/ai/precautions", response_model=PrecautionResponse)
@@ -29,6 +33,7 @@ def generate_precautions(request: PrecautionRequest):
         emergency_type=request.emergency_type,
         description=request.description or "",
         priority=request.priority_score or 50,
+        lang=request.language,
     )
 
 
@@ -45,4 +50,5 @@ def generate_role_intelligence(request: RoleIntelligenceRequest):
         injuries=request.injuries,
         critical_indicators=request.critical_indicators,
         priority_score=request.priority_score,
+        lang=request.language,
     )

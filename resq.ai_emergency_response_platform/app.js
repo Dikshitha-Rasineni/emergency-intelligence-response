@@ -271,20 +271,34 @@ let responderStatus = "AVAILABLE"; // AVAILABLE, BUSY, OFFLINE
 // 2. INTELLIGENCE & DECISION-SUPPORT ENGINE
 // ============================================================================
 
+const LOCALIZED_SEVERITY = {
+  en: { CRITICAL: "CRITICAL", HIGH: "HIGH", MODERATE: "MODERATE", LOW: "LOW" },
+  te: { CRITICAL: "అత్యవసరం (CRITICAL)", HIGH: "అధిక ప్రాధాన్యత (HIGH)", MODERATE: "మధ్యస్థం (MODERATE)", LOW: "సాధారణం (LOW)" },
+  ta: { CRITICAL: "அதிமுக்கியம் (CRITICAL)", HIGH: "உயர் (HIGH)", MODERATE: "நடுத்தரம் (MODERATE)", LOW: "குறைவு (LOW)" },
+  hi: { CRITICAL: "गंभीर (CRITICAL)", HIGH: "उच्च (HIGH)", MODERATE: "मध्यम (MODERATE)", LOW: "सामान्य (LOW)" },
+  kn: { CRITICAL: "ಗಂಭೀರ (CRITICAL)", HIGH: "ಉನ್ನತ (HIGH)", MODERATE: "ಮಧ್ಯಮ (MODERATE)", LOW: "ಸಾಮಾನ್ಯ (LOW)" },
+  ml: { CRITICAL: "അത്യാഹിതം (CRITICAL)", HIGH: "ഉയർന്നത് (HIGH)", MODERATE: "മിതമായത് (MODERATE)", LOW: "കുറഞ്ഞത് (LOW)" },
+};
+
+function getLocalizedSeverityLabel(label, lang = "en") {
+  const l = (lang || "en").toLowerCase();
+  return (LOCALIZED_SEVERITY[l] && LOCALIZED_SEVERITY[l][label]) || label;
+}
+
 /**
  * Calculates priority score and severity classification based on verified inputs
  */
 function evaluateIncidentSeverity(text, injuries, affected, indicators) {
   let score = 30; // base score
-  const lower = text.toLowerCase();
+  const lower = (text || "").toLowerCase();
   
-  if (lower.includes("unconscious") || lower.includes("not breathing") || lower.includes("cardiac") || lower.includes("severe")) {
+  if (lower.includes("unconscious") || lower.includes("not breathing") || lower.includes("cardiac") || lower.includes("severe") || lower.includes("స్పృహ") || lower.includes("बेहोश") || lower.includes("மயக்கம்")) {
     score += 35;
   }
-  if (lower.includes("fire") || lower.includes("smoke") || lower.includes("trapped") || lower.includes("explosion")) {
+  if (lower.includes("fire") || lower.includes("smoke") || lower.includes("trapped") || lower.includes("explosion") || lower.includes("మంటలు") || lower.includes("ఆగ") || lower.includes("தீ") || lower.includes("बೆಂಕಿ")) {
     score += 30;
   }
-  if (lower.includes("accident") || lower.includes("crash") || lower.includes("collision")) {
+  if (lower.includes("accident") || lower.includes("crash") || lower.includes("collision") || lower.includes("ప్రమాదం") || lower.includes("दुर्घटना") || lower.includes("விபத்து") || lower.includes("ಅಪಘಾತ")) {
     score += 20;
   }
   if (injuries > 0) {
@@ -307,11 +321,40 @@ function evaluateIncidentSeverity(text, injuries, affected, indicators) {
 
 /**
  * Generates practical precautions for citizens.
- * Strictly non-diagnostic; practical scene safety instructions only.
+ * Strictly non-diagnostic; uses verified AI-generated precautions from backend if available.
  */
-function generateCitizenPrecautions(emergencyType, text, priority) {
-  const t = emergencyType.toLowerCase() + " " + text.toLowerCase();
-  
+function generateCitizenPrecautions(emergencyType, text, priority, lang = "en") {
+  // If backend returned precautions in user's language, prioritize them directly!
+  if (activeIncident && activeIncident.precautions && activeIncident.precautions.length > 0) {
+    return activeIncident.precautions.map((p, idx) => ({ num: idx + 1, text: p }));
+  }
+
+  const t = (emergencyType || "").toLowerCase() + " " + (text || "").toLowerCase();
+  const currentLang = (lang || (activeIncident && activeIncident.detected_language) || "en").toLowerCase();
+
+  if (currentLang === "te") {
+    if (t.includes("fire") || t.includes("smoke") || t.includes("మంటలు")) {
+      return [
+        { num: 1, text: "పొగ కింద నేలపై వంగి పాకండి — శుభ్రమైన గాలి నేల నుండి 1 అడుగు ఎత్తులో ఉంటుంది." },
+        { num: 2, text: "ఎటువంటి పరిస్థితుల్లోనూ లిఫ్టులను ఉపయోగించవద్దు; అత్యవసర మెట్లను మాత్రమే ఉపయోగించండి." },
+        { num: 3, text: "మంటలు వ్యాపించకుండా ఉండటానికి బయటకు వచ్చేటప్పుడు తలుపులు మూసివేయండి." },
+        { num: 4, text: "బట్టలకు మంటలు అంటుకుంటే: వెంటనే ఆగండి, నేలపై పడుకోండి, దొర్లండి (Stop, Drop, Roll)." }
+      ];
+    } else if (t.includes("flood") || t.includes("water") || t.includes("వరద")) {
+      return [
+        { num: 1, text: "ప్రవహించే వరద నీటిలో నడవడానికి లేదా వాహనాలు నడపడానికి ప్రయత్నించవద్దు." },
+        { num: 2, text: "నీటిలో మునిగిన విద్యుత్ వైర్లు మరియు తెరిచి ఉన్న మ్యాన్‌హోల్స్ పట్ల జాగ్రత్తగా ఉండండి." },
+        { num: 3, text: "రెస్క్యూ బృందాలు వచ్చే వరకు ఎత్తైన ప్రదేశంలో లేదా భవనం పైకప్పుపై వేచి ఉండండి." }
+      ];
+    } else {
+      return [
+        { num: 1, text: "తీవ్రంగా గాయపడిన వ్యక్తులను మంటలు లేదా పేలుడు ప్రమాదం లేకపోతే కదల్చవద్దు." },
+        { num: 2, text: "రహదారి రద్దీకి దూరంగా, సురక్షితమైన ప్రదేశంలో నిలబడండి." },
+        { num: 3, text: "అత్యవసర అంబులెన్స్ రాక కోసం రహదారి మార్గాన్ని ఖాళీగా ఉంచండి." }
+      ];
+    }
+  }
+
   if (t.includes("fire") || t.includes("smoke") || t.includes("burn")) {
     return [
       { num: 1, text: "Move away from the fire immediately and stay upwind of smoke." },
@@ -338,7 +381,6 @@ function generateCitizenPrecautions(emergencyType, text, priority) {
       { num: 5, text: "Ensure apartment gate or building lobby is held open for incoming ambulance crew." }
     ];
   } else {
-    // Road accident or general collision
     return [
       { num: 1, text: "Move to a safe position off the road corridor to avoid secondary vehicle impacts." },
       { num: 2, text: "Do not move an injured person unless there is immediate danger (e.g. active vehicle fire)." },
@@ -356,6 +398,60 @@ function generateCitizenPrecautions(emergencyType, text, priority) {
 function generateRoleIntelligence(role, incident) {
   const isCritical = incident.system_priority >= 75;
   const isHigh = incident.system_priority >= 50;
+
+  // Use backend multilingual recommendations if present
+  if (incident && incident.recommendations && incident.recommendations.recommendation) {
+    const rec = incident.recommendations;
+    const checklist = rec.operational_checklist || [rec.recommendation];
+    if (role === "HOSPITAL") {
+      return {
+        required_services: [
+          { label: "Emergency Department Triage", status: "Required", verified: true },
+          { label: "Trauma Resuscitation Bay", status: isCritical ? "Immediate Prep" : "Standby", verified: true },
+          { label: "Ambulance Receiving Ramp", status: "Designate Bay 2", verified: true },
+          { label: "Emergency Medical Team", status: "Alerted", verified: true }
+        ],
+        capacity_needs: {
+          affected_count: incident.affected_people,
+          injuries_count: incident.injuries,
+          critical_count: (incident.description || "").toLowerCase().includes("unconscious") ? 1 : 0
+        },
+        recommended_prep: checklist,
+        summary: rec.summary
+      };
+    } else if (role === "POLICE") {
+      return {
+        required_response: [
+          { label: "Dispatch Nearest Patrol Unit", status: "En Route", verified: true },
+          { label: "Secure Incident Perimeter", status: "Required", verified: true },
+          { label: "Corridor Traffic Management", status: isHigh ? "High Priority" : "Monitor", verified: true }
+        ],
+        scene_intelligence: {
+          corridor: incident.location_name || incident.location,
+          traffic_impact: isCritical ? "Severe Lane Obstruction" : "Moderate Slowdown",
+          road_blockage: "Corridor Managed",
+          priority_level: isCritical ? "CRITICAL" : "HIGH"
+        },
+        recommended_actions: checklist,
+        summary: rec.summary
+      };
+    } else if (role === "FIRE") {
+      return {
+        required_response: [
+          { label: "Deploy Heavy Rescue Tender", status: "En Route", verified: true },
+          { label: "Hydraulic Extrication Readiness", status: "Required", verified: true },
+          { label: "Hazard Isolation Perimeter", status: "Active", verified: true }
+        ],
+        tactical_assessment: {
+          hazard_condition: "Scene Scan Active",
+          staging_sector: "Upwind Corridor",
+          water_foam_readiness: "Ready"
+        },
+        recommended_actions: checklist,
+        summary: rec.summary
+      };
+    }
+  }
   
   if (role === "HOSPITAL") {
     return {
@@ -605,17 +701,21 @@ const RESQ_API = {
 
   async getNearbyResources(lat, lng, type = null, radius = 25.0) {
     if (this.isBackendConnected) {
+      if (lat == null || lng == null) {
+        return [];
+      }
       try {
         let url = `${this.activeEndpoint}/resources/nearby?latitude=${lat}&longitude=${lng}&radius=${radius}`;
         if (type && type !== "ALL") url += `&type=${encodeURIComponent(type)}`;
         const res = await fetch(url);
         if (res.ok) {
           const list = await res.json();
-          if (list && list.length > 0) return list;
+          return Array.isArray(list) ? list : [];
         }
       } catch (e) {
         console.warn("Fetch nearby resources error:", e);
       }
+      return [];
     }
     return type && type !== "ALL" ? ALL_RESOURCES.filter(r => r.type === type) : ALL_RESOURCES;
   },
@@ -1101,25 +1201,47 @@ function renderCitizenDashboard() {
           </div>
           <div class="card-body">
             <textarea id="citizenDescriptionInput" 
-                      style="width:100%;height:100px;padding:10px 12px;border:1px solid #cbd5e1;border-radius:var(--radius-sm);font-family:var(--font-sans);font-size:14px;resize:vertical;outline:none;" 
+                      style="width:100%;height:90px;padding:10px 12px;border:1px solid #cbd5e1;border-radius:var(--radius-sm);font-family:var(--font-sans);font-size:14px;resize:vertical;outline:none;" 
                       placeholder="e.g. Major accident near highway. Three people injured and one person is unconscious.">${activeIncident.description}</textarea>
             
-            <div style="margin-top:12px;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;">
-              <div style="display:flex;align-items:center;gap:6px;">
-                <span style="font-size:14px;">📍</span>
-                <span style="font-weight:500;font-size:13px;" id="locationDisplay">${activeIncident.location_name}</span>
+            <div style="margin-top:12px;display:flex;flex-direction:column;gap:8px;">
+              <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;">
+                <label style="font-size:12px;font-weight:600;color:#475569;min-width:70px;">Location:</label>
+                <input type="text" id="citizenLocationInput" value="${activeIncident.location_name || ''}" 
+                       style="flex:1;min-width:220px;padding:8px 12px;border:1px solid #cbd5e1;border-radius:var(--radius-sm);font-size:13px;outline:none;" 
+                       placeholder="e.g. Location X or MG Road, Bengaluru">
+                <button class="btn btn-secondary btn-sm" onclick="detectUserLocation()">Detect GPS</button>
+                <button class="btn btn-secondary btn-sm" onclick="toggleLocationDetails()">GPS Details</button>
               </div>
-              <div style="display:flex;gap:6px;">
-                <button class="btn btn-secondary btn-sm" onclick="detectUserLocation()">Detect Location</button>
-                <button class="btn btn-secondary btn-sm" onclick="promptChangeLocation()">Change Location</button>
-                <button class="btn btn-secondary btn-sm" onclick="toggleLocationDetails()">View Location Details</button>
+
+              <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;padding-top:4px;">
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                  ${activeIncident.coordinates_verified === false || activeIncident.location_source === 'UNVERIFIED'
+                    ? '<span class="badge" style="background:#fee2e2;color:#991b1b;font-weight:600;font-size:11px;">⚠️ UNVERIFIED COORDINATES (Original Text Preserved)</span>'
+                    : '<span class="badge" style="background:#dcfce7;color:#166534;font-weight:600;font-size:11px;">✓ VERIFIED LOCATION COORDINATES</span>'
+                  }
+                  <span class="badge" style="background:#ede9fe;color:#5b21b6;font-size:11px;font-weight:600;">LANG: ${(activeIncident.detected_language || 'en').toUpperCase()}</span>
+                </div>
+
+                <div style="display:flex;align-items:center;gap:6px;">
+                  <label style="font-size:12px;color:#64748b;font-weight:500;">Language:</label>
+                  <select id="citizenLanguageSelect" style="padding:4px 8px;border:1px solid #cbd5e1;border-radius:var(--radius-sm);font-size:12px;background:#ffffff;outline:none;">
+                    <option value="auto" ${!activeIncident.detected_language || activeIncident.detected_language === 'auto' ? 'selected' : ''}>Auto-Detect</option>
+                    <option value="en" ${activeIncident.detected_language === 'en' ? 'selected' : ''}>English</option>
+                    <option value="te" ${activeIncident.detected_language === 'te' ? 'selected' : ''}>Telugu (తెలుగు)</option>
+                    <option value="ta" ${activeIncident.detected_language === 'ta' ? 'selected' : ''}>Tamil (தமிழ்)</option>
+                    <option value="hi" ${activeIncident.detected_language === 'hi' ? 'selected' : ''}>Hindi (हिन्दी)</option>
+                    <option value="kn" ${activeIncident.detected_language === 'kn' ? 'selected' : ''}>Kannada (ಕನ್ನಡ)</option>
+                    <option value="ml" ${activeIncident.detected_language === 'ml' ? 'selected' : ''}>Malayalam (മലയാളം)</option>
+                  </select>
+                </div>
               </div>
             </div>
 
             <!-- Expandable Location Details (Hidden by default) -->
             <div id="locationDetailsBox" style="display:none;margin-top:10px;padding:8px 12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:var(--radius-sm);font-size:12px;color:#475569;">
-              <div class="mono">Coordinates: ${activeIncident.latitude}° N, ${activeIncident.longitude}° E</div>
-              <div>Notes: ${activeIncident.location_details}</div>
+              <div class="mono">Coordinates: ${activeIncident.latitude != null ? activeIncident.latitude + '° N, ' + activeIncident.longitude + '° E' : 'Unresolved / Unverified (No coordinates injected)'}</div>
+              <div>Source: ${activeIncident.location_source || 'USER_ENTERED'} · Accuracy: ${activeIncident.location_details || 'Manual Landmark'}</div>
             </div>
 
             <div style="margin-top:14px;display:flex;justify-content:flex-end;">
@@ -1278,15 +1400,19 @@ function renderCitizenDashboard() {
 let currentResources = [...ALL_RESOURCES];
 
 async function syncNearbyResources(filterType = "ALL") {
-  if (RESQ_API.isBackendConnected && activeIncident.latitude && activeIncident.longitude) {
-    const list = await RESQ_API.getNearbyResources(
-      activeIncident.latitude,
-      activeIncident.longitude,
-      filterType
-    );
-    if (list && list.length > 0) {
-      currentResources = list;
-      return list;
+  if (RESQ_API.isBackendConnected) {
+    if (activeIncident && activeIncident.latitude != null && activeIncident.longitude != null) {
+      const list = await RESQ_API.getNearbyResources(
+        activeIncident.latitude,
+        activeIncident.longitude,
+        filterType
+      );
+      currentResources = Array.isArray(list) ? list : [];
+      return currentResources;
+    } else {
+      // Unverified coordinates: do NOT inject Bengaluru resources!
+      currentResources = [];
+      return currentResources;
     }
   }
   currentResources = filterType === "ALL" ? ALL_RESOURCES : ALL_RESOURCES.filter(r => r.type === filterType);
@@ -1299,31 +1425,62 @@ async function syncNearbyResources(filterType = "ALL") {
 function renderNearbyServicesRows(filterType) {
   const filtered = filterType === "ALL" 
     ? currentResources 
-    : currentResources.filter(r => (r.type || r.resource_type) === filterType);
+    : currentResources.filter(r => {
+        const t = (r.type || r.resource_type || "").toUpperCase();
+        if (filterType === "HOSPITAL") {
+          return t === "HOSPITAL" || t === "CLINIC";
+        }
+        return t === filterType;
+      });
 
-  if (filtered.length === 0) {
-    return `<div style="padding:16px;text-align:center;color:#64748b;font-size:13px;">No ${filterType} resources found in current sector radius.</div>`;
+  if (!filtered || filtered.length === 0) {
+    if (activeIncident && (activeIncident.coordinates_verified === false || activeIncident.latitude == null)) {
+      return `<div style="padding:14px;text-align:center;color:#b91c1c;font-size:12px;background:#fef2f2;border:1px solid #fecaca;border-radius:6px;margin:8px 0;">
+        ⚠️ Location coordinates are unverified. Please enter an identifiable landmark or detect GPS to discover real facilities in this sector.
+      </div>`;
+    }
+    return `<div style="padding:16px;text-align:center;color:#64748b;font-size:13px;">No ${filterType === 'ALL' ? '' : filterType} emergency facilities found within sector search radius.</div>`;
   }
 
-  return filtered.map(item => `
-    <div class="service-row">
+  return filtered.map(item => {
+    const isClinic = item.is_clinic || (item.type || item.resource_type || "").toUpperCase() === "CLINIC" || (item.name || "").toLowerCase().includes("clinic");
+    const rType = isClinic ? "CLINIC" : (item.type || item.resource_type || "HOSPITAL").toUpperCase();
+    const icon = isClinic ? "🩺" : (rType === "HOSPITAL" ? "🏥" : rType === "AMBULANCE" ? "🚑" : rType === "POLICE" ? "🚓" : "🚒");
+    const badgeLabel = isClinic 
+      ? '<span style="display:inline-block;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:700;background:#fef3c7;color:#92400e;margin-left:4px;">CLINIC / OUTPATIENT</span>' 
+      : (rType === "HOSPITAL" ? '<span style="display:inline-block;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:700;background:#dcfce7;color:#166534;margin-left:4px;">EMERGENCY HOSPITAL</span>' : '');
+
+    const providerBadge = item.provider 
+      ? `<span style="font-size:10px;color:#64748b;margin-left:4px;">(${item.provider})</span>` 
+      : '';
+
+    const navLink = item.navigation_url || `https://www.google.com/maps/dir/?api=1&destination=${item.latitude || item.lat},${item.longitude || item.lng}`;
+
+    return `
+    <div class="service-row" style="padding:10px 12px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between;gap:10px;">
       <div style="display:flex;align-items:flex-start;gap:10px;">
-        <div style="font-size:18px;margin-top:2px;">
-          ${(item.type || item.resource_type) === "HOSPITAL" ? "🏥" : (item.type || item.resource_type) === "AMBULANCE" ? "🚑" : (item.type || item.resource_type) === "POLICE" ? "🚓" : "🚒"}
-        </div>
+        <div style="font-size:18px;margin-top:2px;">${icon}</div>
         <div>
-          <div style="font-weight:600;font-size:13px;color:#0f172a;">${item.name}</div>
-          <div style="font-size:12px;color:#475569;margin-top:1px;">${item.capability || (item.capabilities ? item.capabilities.join(' · ') : 'Emergency Unit Ready')}</div>
-          <div style="font-size:11px;color:#16a34a;font-weight:500;margin-top:2px;">${item.availability || 'Available'}</div>
+          <div style="font-weight:600;font-size:13px;color:#0f172a;display:flex;align-items:center;flex-wrap:wrap;gap:2px;">
+            <span>${item.name}</span>
+            ${badgeLabel}
+            ${providerBadge}
+          </div>
+          <div style="font-size:12px;color:#475569;margin-top:1px;">${item.capability || (item.capabilities ? item.capabilities.join(' · ') : (item.address || 'Emergency Unit Ready'))}</div>
+          <div style="font-size:11px;color:#16a34a;font-weight:500;margin-top:2px;">${item.availability || 'Available'} · Phone: ${item.contact || item.phone || '112'}</div>
         </div>
       </div>
       <div style="text-align:right;flex-shrink:0;">
-        <div class="mono" style="font-weight:700;font-size:13px;color:#0f172a;">${item.distance_km || 2.5} km</div>
-        <div class="mono" style="font-size:12px;color:#2563eb;font-weight:600;">${item.eta_min || 8} min</div>
-        <button class="btn btn-secondary btn-sm" style="margin-top:4px;" onclick="viewServiceDetails('${item.id || item.resource_id}')">View</button>
+        <div class="mono" style="font-weight:700;font-size:13px;color:#0f172a;">${item.distance_km != null ? item.distance_km : 2.5} km</div>
+        <div class="mono" style="font-size:12px;color:#2563eb;font-weight:600;">${item.eta_min != null ? item.eta_min : (item.eta_minutes != null ? item.eta_minutes : 8)} min</div>
+        <div style="display:flex;gap:4px;margin-top:4px;justify-content:flex-end;">
+          <button class="btn btn-secondary btn-sm" onclick="viewServiceDetails('${item.id || item.resource_id}')">Info</button>
+          <a href="${navLink}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm" style="text-decoration:none;display:inline-flex;align-items:center;">Map ↗</a>
+        </div>
       </div>
     </div>
-  `).join('');
+  `;
+  }).join('');
 }
 
 async function filterNearbyServices(type, btnEl) {
@@ -1795,8 +1952,8 @@ async function renderAdminDashboard() {
           <thead>
             <tr style="border-bottom:2px solid #e2e8f0;text-align:left;color:#64748b;font-size:11px;text-transform:uppercase;">
               <th style="padding:8px;">Incident ID</th>
-              <th style="padding:8px;">Type</th>
-              <th style="padding:8px;">Location</th>
+              <th style="padding:8px;">Type & Lang</th>
+              <th style="padding:8px;">Location & Status</th>
               <th style="padding:8px;">Injuries</th>
               <th style="padding:8px;">Priority</th>
               <th style="padding:8px;">Status</th>
@@ -1804,24 +1961,45 @@ async function renderAdminDashboard() {
             </tr>
           </thead>
           <tbody>
-            ${incidentsList.map(inc => `
+            ${incidentsList.map(inc => {
+              const locDisplay = inc.location_name || inc.location || "Location Unspecified";
+              const isUnverified = inc.coordinates_verified === false || inc.location_source === "UNVERIFIED" || inc.latitude == null;
+              const langCode = (inc.detected_language || inc.language || "en").toUpperCase();
+              const badgeVerified = isUnverified
+                ? '<span class="badge" style="background:#fee2e2;color:#991b1b;font-size:10px;">⚠️ UNVERIFIED</span>'
+                : '<span class="badge" style="background:#dcfce7;color:#166534;font-size:10px;">✓ VERIFIED</span>';
+              const badgeLang = `<span class="badge" style="background:#ede9fe;color:#5b21b6;font-size:10px;margin-left:4px;">${langCode}</span>`;
+              return `
               <tr style="border-bottom:1px solid #f1f5f9;">
                 <td style="padding:8px;" class="mono"><b>${inc.incident_id || inc.id}</b></td>
-                <td style="padding:8px;">${inc.emergency_type}</td>
-                <td style="padding:8px;font-size:12px;color:#475569;">${inc.location_name || inc.location}</td>
-                <td style="padding:8px;">${inc.injuries}</td>
+                <td style="padding:8px;">${inc.emergency_type} ${badgeLang}</td>
+                <td style="padding:8px;font-size:12px;color:#475569;">
+                  <div style="font-weight:600;color:#0f172a;">${locDisplay}</div>
+                  <div style="margin-top:2px;">${badgeVerified}</div>
+                </td>
+                <td style="padding:8px;">${inc.injuries != null ? inc.injuries : 0}</td>
                 <td style="padding:8px;"><span class="badge ${(inc.system_priority || inc.priority_score) >= 75 ? 'badge-emergency' : (inc.system_priority || inc.priority_score) >= 50 ? 'badge-warning' : 'badge-safe'} mono">${inc.system_priority || inc.priority_score}/100</span></td>
                 <td style="padding:8px;font-size:12px;">${inc.status}</td>
                 <td style="padding:8px;">
-                  <button class="btn btn-secondary btn-sm" onclick="selectIncidentById('${inc.incident_id || inc.id}')">Load</button>
+                  <button class="btn btn-secondary btn-sm" onclick="selectIncidentById('${inc.incident_id || inc.id}')">Load CAD</button>
                 </td>
               </tr>
-            `).join('')}
+            `;
+            }).join('')}
           </tbody>
         </table>
       </div>
     </div>
   `;
+
+  // Start periodic 5s polling for Admin supervision
+  if (!window.adminPollInterval) {
+    window.adminPollInterval = setInterval(() => {
+      if (currentRole === "ADMIN") {
+        renderAdminDashboard();
+      }
+    }, 5000);
+  }
 }
 
 // ============================================================================
@@ -1865,9 +2043,15 @@ function handleCitizenPriorityChange(val) {
 
 async function submitCitizenUpdate() {
   const textarea = document.getElementById("citizenDescriptionInput");
+  const locInput = document.getElementById("citizenLocationInput");
+  const langSelect = document.getElementById("citizenLanguageSelect");
+
   if (!textarea) return;
   const newText = textarea.value.trim();
-  if (newText.length < 5) {
+  const newLoc = locInput ? locInput.value.trim() : (activeIncident.location_name || "");
+  const selectedLang = langSelect ? langSelect.value : (activeIncident.detected_language || "auto");
+
+  if (newText.length < 3) {
     alert("Please enter a valid emergency description.");
     return;
   }
@@ -1879,26 +2063,65 @@ async function submitCitizenUpdate() {
   }
 
   try {
-    const payload = {
-      description: newText,
-      latitude: activeIncident.latitude,
-      longitude: activeIncident.longitude,
-      location_name: activeIncident.location_name,
-      affected_people: activeIncident.affected_people || 0,
-      injuries: activeIncident.injuries || 0,
-      critical_indicators: activeIncident.critical_indicators || [],
-      user_priority: activeIncident.user_priority
-    };
+    const isExisting = activeIncident.incident_id && !activeIncident.incident_id.startsWith("INC-LOCAL");
 
-    const created = await RESQ_API.createIncident(payload);
-    if (created) {
-      activeIncident = {
-        ...activeIncident,
-        ...created,
-        incident_id: created.incident_id || created.id,
-        system_priority: created.priority_score || created.system_priority,
-        user_priority: activeIncident.user_priority || created.priority_score
+    if (isExisting && RESQ_API.isBackendConnected) {
+      // Use updateIncident (PATCH) so location and description are cleanly updated/preserved!
+      const updatePayload = {
+        description: newText,
+        location_name: newLoc,
+        user_priority: activeIncident.user_priority,
       };
+      if (selectedLang && selectedLang !== "auto") {
+        updatePayload.language = selectedLang;
+      }
+      if (activeIncident.coordinates_verified && activeIncident.latitude != null) {
+        updatePayload.latitude = activeIncident.latitude;
+        updatePayload.longitude = activeIncident.longitude;
+      }
+
+      const updated = await RESQ_API.updateIncident(activeIncident.incident_id, updatePayload);
+      if (updated) {
+        activeIncident = {
+          ...activeIncident,
+          ...updated,
+          incident_id: updated.incident_id || updated.id,
+          system_priority: updated.priority_score != null ? updated.priority_score : updated.system_priority,
+          user_priority: activeIncident.user_priority || updated.priority_score,
+          location_name: updated.location_name || updated.location || newLoc,
+          coordinates_verified: updated.coordinates_verified,
+          detected_language: updated.detected_language || selectedLang
+        };
+      }
+    } else {
+      // Create new incident
+      const payload = {
+        description: newText,
+        location_name: newLoc,
+        latitude: activeIncident.latitude,
+        longitude: activeIncident.longitude,
+        affected_people: activeIncident.affected_people || 0,
+        injuries: activeIncident.injuries || 0,
+        critical_indicators: activeIncident.critical_indicators || [],
+        user_priority: activeIncident.user_priority
+      };
+      if (selectedLang && selectedLang !== "auto") {
+        payload.language = selectedLang;
+      }
+
+      const created = await RESQ_API.createIncident(payload);
+      if (created) {
+        activeIncident = {
+          ...activeIncident,
+          ...created,
+          incident_id: created.incident_id || created.id,
+          system_priority: created.priority_score || created.system_priority,
+          user_priority: activeIncident.user_priority || created.priority_score,
+          location_name: created.location_name || created.location || newLoc,
+          coordinates_verified: created.coordinates_verified,
+          detected_language: created.detected_language || selectedLang
+        };
+      }
     }
 
     await syncNearbyResources();

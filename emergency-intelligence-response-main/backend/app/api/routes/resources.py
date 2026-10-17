@@ -67,3 +67,16 @@ def rank_resources(
         total_found=len(ranked),
         resources=ranked,
     )
+
+
+@router.get("/resources/geocode")
+def geocode_location(query: str = Query(..., min_length=2)):
+    """
+    Geocodes an address or landmark to latitude, longitude, and formatted name.
+    """
+    from app.services.geospatial_discovery_service import GeospatialDiscoveryService
+    res = GeospatialDiscoveryService.geocode_location(query)
+    if not res:
+        return {"found": False, "query": query, "message": "Location could not be verified."}
+    lat, lng, display = res
+    return {"found": True, "query": query, "latitude": lat, "longitude": lng, "display_name": display}

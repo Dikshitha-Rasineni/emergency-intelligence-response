@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, Float, Integer, Text, DateTime
+from sqlalchemy import Column, String, Float, Integer, Text, DateTime, Boolean
 from sqlalchemy.orm import relationship
 from app.db.session import Base
 
@@ -10,9 +10,12 @@ class EmergencyReport(Base):
 
     id = Column(String(50), primary_key=True, default=lambda: f"INC-{uuid.uuid4().hex[:8].upper()}")
     description = Column(Text, nullable=False)
-    latitude = Column(Float, nullable=False, index=True)
-    longitude = Column(Float, nullable=False, index=True)
+    latitude = Column(Float, nullable=True, index=True)
+    longitude = Column(Float, nullable=True, index=True)
     location = Column(String(255), nullable=True)
+    location_source = Column(String(50), default="USER_ENTERED", nullable=True)  # USER_ENTERED, DEVICE_GPS, GEOCODED, UNVERIFIED
+    coordinates_verified = Column(Boolean, default=True, nullable=True)
+    detected_language = Column(String(20), default="en", nullable=True)
     affected_people = Column(Integer, default=0, nullable=False)
     injuries = Column(Integer, default=0, nullable=False)
     status = Column(String(50), default="REPORTED", nullable=False)  # REPORTED, ACKNOWLEDGED, DISPATCHED, RESOLVED
