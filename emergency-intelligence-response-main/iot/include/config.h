@@ -1,66 +1,50 @@
 #pragma once
+#include <stdint.h>
 
-#include <Arduino.h>
-
-// Detected hardware: ESP32 DevKit V1 / ESP32-D0WD-V3 rev 3.1.
+// Verify these provisional ESP32 DevKit V1 assignments against the actual board/wiring.
 static constexpr char DEVICE_ID[] = "RESQ-ESP32-001";
-static constexpr char FIRMWARE_VERSION[] = "0.2.0";
-// Re-check with `ipconfig` whenever the backend PC receives a new DHCP address.
-static constexpr char API_BASE_URL[] = "http://10.3.213.89:8000";
-static constexpr char API_PATH[] = "/api/v1/iot/events";
+static constexpr char FIRMWARE_VERSION[] = "1.0.0";
+static constexpr uint32_t SERIAL_BAUD = 115200;
+static constexpr int PIN_I2C_SDA = 21, PIN_I2C_SCL = 22;
+static constexpr uint8_t MPU6050_ADDRESS = 0x68;
+static constexpr int PIN_MQ2_ADC = 32; // ADC1; input must be <= 3.3 V (prefer <= 3.1 V)
+static constexpr int PIN_DHT22 = 4;
+static constexpr int PIN_STATUS_LED = -1; // disabled until board/wiring verified
+static constexpr int PIN_BUZZER = -1; // disabled until board/wiring verified
 
-// Pin map is based on the supplied RESQ.AI wiring diagram.
-static constexpr int I2C_SDA_PIN = 21;
-static constexpr int I2C_SCL_PIN = 22;
-static constexpr uint8_t MPU6050_PRIMARY_ADDRESS = 0x68;
-static constexpr uint8_t MPU6050_ALT_ADDRESS = 0x69;
-static constexpr int DHT_PIN = 4;
-static constexpr int FSR_PIN = 34;             // analog pressure/force sensor
-static constexpr int SOUND_PIN = 35;           // analog sound module output
-static constexpr int MQ2_PIN = 32;             // MQ-2 AO; must be <=3.3 V
-static constexpr int WATER_PIN = -1;           // no water sensor shown in diagram
-static constexpr int SIM800L_RX_PIN = 16;      // ESP32 RX2 <- SIM800L TXD
-static constexpr int SIM800L_TX_PIN = 17;      // ESP32 TX2 -> SIM800L RXD
-static constexpr uint32_t SIM800L_BAUD = 9600;
-static constexpr int SOS_PIN = 5;
-static constexpr int STATUS_LED_PIN = -1;      // GPIO2 is used by DIP SW3 in the diagram
-static constexpr int BUZZER_PIN = 12;
-static constexpr bool HAS_DHT = true;
-static constexpr bool HAS_FSR = true;
-static constexpr bool HAS_SOUND = true;
-static constexpr bool HAS_MQ2 = true;
-static constexpr bool HAS_WATER_SENSOR = false;
-static constexpr bool HAS_SIM800L = true;
-static constexpr bool HAS_SOS = false;
-static constexpr bool HAS_STATUS_LED = false;
-static constexpr bool HAS_BUZZER = true;
-
-// Set genuine fixed installation coordinates for a stationary testbed.
+// Set only to a real, trusted fixed installation location. Zero/zero means unknown.
 static constexpr double FIXED_LATITUDE = 0.0;
 static constexpr double FIXED_LONGITUDE = 0.0;
+inline bool hasConfiguredLocation() { return FIXED_LATITUDE>=-90.0 && FIXED_LATITUDE<=90.0 && FIXED_LONGITUDE>=-180.0 && FIXED_LONGITUDE<=180.0 && !(FIXED_LATITUDE==0.0 && FIXED_LONGITUDE==0.0); }
 
-static constexpr uint32_t IMPACT_SAMPLE_MS = 10;
-static constexpr uint32_t DHT_SAMPLE_MS = 2200;
-static constexpr uint32_t ANALOG_SAMPLE_MS = 100;
+static constexpr uint32_t SENSOR_TICK_MS = 20;
+static constexpr uint32_t MPU_SAMPLE_MS = 50;
+static constexpr uint32_t MQ2_SAMPLE_MS = 250;
+static constexpr uint32_t DHT_SAMPLE_MS = 2500;
 static constexpr uint32_t TELEMETRY_INTERVAL_MS = 30000;
-static constexpr uint32_t WIFI_RETRY_MS = 10000;
+static constexpr uint32_t MQ2_WARMUP_MS = 60000; // increase to the module maker's full preheat time
+static constexpr uint16_t MQ2_BASELINE_SAMPLES = 120;
+static constexpr uint32_t MQ2_BASELINE_WINDOW_MS = 30000;
+static constexpr uint16_t MQ2_WARNING_DELTA_ADC = 350;
+static constexpr uint16_t MQ2_CRITICAL_DELTA_ADC = 800;
+static constexpr uint16_t MQ2_HYSTERESIS_ADC = 100;
+static constexpr uint32_t MQ2_PERSIST_MS = 5000;
+static constexpr float TEMP_WARNING_C = 50.0f;
+static constexpr float TEMP_CRITICAL_C = 60.0f;
+static constexpr float TEMP_HYSTERESIS_C = 3.0f;
+static constexpr uint32_t TEMP_PERSIST_MS = 10000;
+static constexpr float IMPACT_THRESHOLD_G = 5.0f; // filtered total acceleration, including gravity
+static constexpr float VIBRATION_THRESHOLD_G = 1.8f;
+static constexpr uint8_t IMPACT_CONFIRM_SAMPLES = 3;
+static constexpr uint32_t ALERT_REPEAT_COOLDOWN_MS = 60000;
+static constexpr uint8_t OFFLINE_QUEUE_CAPACITY = 8;
+static constexpr uint32_t WIFI_RETRY_BASE_MS = 1000;
+static constexpr uint32_t WIFI_RETRY_MAX_MS = 60000;
 static constexpr uint32_t HTTP_TIMEOUT_MS = 5000;
-static constexpr uint32_t EMERGENCY_COOLDOWN_MS = 60000;
-static constexpr uint8_t IMPACT_QUALIFYING_SAMPLES = 2;
-static constexpr float IMPACT_THRESHOLD_G = 5.0f;
-static constexpr float FIRE_SMOKE_THRESHOLD_PPM = 1500.0f;
-static constexpr float FIRE_TEMPERATURE_C = 60.0f;
-static constexpr float FLOOD_WATER_CM = 50.0f;
+static constexpr uint32_t API_MIN_INTERVAL_MS = 1000;
 
-// MQ-2 raw ADC is not ppm. These coefficients are placeholders for calibration.
-static constexpr float MQ2_SLOPE_PPM_PER_ADC = 1.0f;
-static constexpr float MQ2_BASELINE_ADC = 0.0f;
-static constexpr uint32_t MQ2_WARMUP_MS = 60000;
-
-static constexpr float WATER_CM_PER_ADC = 0.1f;
-static constexpr float WATER_ADC_OFFSET = 0.0f;
-static constexpr uint32_t SIM800L_POLL_MS = 30000;
-static constexpr uint32_t SIM800L_TIMEOUT_MS = 1200;
-static constexpr uint8_t EVENT_QUEUE_CAPACITY = 8;
-static constexpr uint32_t QUEUE_DRAIN_INTERVAL_MS = 5000;
+// Copy secrets.example.h to secrets.h. HTTP is permitted only for an explicit local
+// development URL; remote URLs must use HTTPS with certificate validation.
+static constexpr bool ALLOW_INSECURE_LOCAL_HTTP = true;
 static constexpr bool SIMULATION_MODE = false;
+static constexpr bool ALLOW_SIMULATION_UPLOAD = false;

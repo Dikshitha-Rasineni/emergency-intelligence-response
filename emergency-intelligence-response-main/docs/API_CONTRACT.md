@@ -164,7 +164,15 @@ Generates role-specific intelligence and staging checklists for Hospital, Police
 ## 6. IoT Telemetry Gateway
 
 ### `POST /api/v1/iot/events`
-Ingests telemetry from ESP32 crash, smoke, and water level sensors. Automatically triggers incidents on critical thresholds.
+Ingests telemetry from ESP32 sensors. Routine telemetry is stored but does not create an incident from a single threshold crossing. A device may set `alert_qualified: true` only after its configured persistence/confirmation rules pass; qualified `ACCIDENT`, `FIRE`, or `FLOOD` events then enter the existing incident assessment workflow.
+
+Optional sensor fields include `humidity_percent`, `mq2_raw_adc`, `mq2_filtered_adc`, `mq2_baseline_adc`, `acceleration_magnitude_g`, `acceleration_magnitude_mps2`, `dynamic_acceleration_g`, `vibration_rms_g`, and `gyro_x_dps`/`gyro_y_dps`/`gyro_z_dps`. MQ-2 ADC values are raw counts and must not be sent as `smoke_level` ppm. Qualified alerts may include `source_sensor`, `observed_value`, `threshold_value`, `measurement_unit`, `hazard_severity`, and `reason` for the preliminary sensor observation. These fields are persisted with the reading and included in the incident description.
+
+Device health fields include `firmware_version`, `wifi_connected`, `uptime_ms`, and individual availability/warm-up/calibration flags for MPU6050, DHT22 and MQ-2. These are stored with each sensor reading.
+
+`simulated: true` identifies mock data. It is stored for diagnostics and never triggers an incident, even if the supplied event type is critical. Routine values are `alert_qualified: false`; threshold-based incident creation requires device-side qualification.
+
+Apply database migrations with `python -m alembic upgrade head` before sending the new fields. The endpoint still requires latitude/longitude and currently does not authenticate device tokens.
 
 ---
 

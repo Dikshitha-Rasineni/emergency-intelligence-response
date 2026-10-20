@@ -158,6 +158,13 @@ def test_iot_event_ingestion():
         "temperature": 32.5,
         "smoke_level": 400.0,
         "impact": 8.7,  # > 5.0 G trigger threshold
+        "alert_qualified": True,
+        "source_sensor": "mpu6050",
+        "observed_value": 8.7,
+        "threshold_value": 5.0,
+        "measurement_unit": "g",
+        "hazard_severity": "critical",
+        "reason": "qualified_abnormal_motion",
         "latitude": 12.9352,
         "longitude": 77.6944,
     }
@@ -181,3 +188,52 @@ def test_iot_event_without_type_defaults_to_telemetry():
     data = response.json()
     assert data["event_type"] == "TELEMETRY"
     assert data["incident_id"] is None
+
+
+def test_iot_telemetry_threshold_crossing_requires_qualification():
+    payload = {
+        "device_id": "RESQ-TEST-NOISE",
+        "event_type": "TELEMETRY",
+        "temperature": 65.0,
+        "impact": 8.0,
+        "alert_qualified": False,
+        "humidity_percent": 44.2,
+        "mq2_raw_adc": 810,
+        "mq2_filtered_adc": 800,
+        "mq2_baseline_adc": 500,
+        "acceleration_magnitude_g": 1.03,
+        "firmware_version": "1.0.0",
+        "wifi_connected": True,
+        "uptime_ms": 30000,
+        "mpu6050_available": True,
+        "dht22_available": True,
+        "mq2_available": True,
+        "mq2_warmed": True,
+        "mq2_calibrated": True,
+        "latitude": 12.9,
+        "longitude": 80.1,
+    }
+    response = client.post("/api/v1/iot/events", json=payload)
+    assert response.status_code == 201
+    assert response.json()["incident_id"] is None
+
+
+def test_simulated_iot_alert_is_stored_without_incident():
+    payload = {
+        "device_id": "RESQ-TEST-SIMULATION",
+        "event_type": "FIRE",
+        "temperature": 75.0,
+        "alert_qualified": True,
+        "simulated": True,
+        "source_sensor": "dht22",
+        "observed_value": 75.0,
+        "threshold_value": 60.0,
+        "measurement_unit": "celsius",
+        "hazard_severity": "critical",
+        "reason": "simulated_test_alert",
+        "latitude": 12.9,
+        "longitude": 80.1,
+    }
+    response = client.post("/api/v1/iot/events", json=payload)
+    assert response.status_code == 201
+    assert response.json()["incident_id"] is None
