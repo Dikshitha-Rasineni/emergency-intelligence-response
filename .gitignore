@@ -57,3 +57,5 @@ frontend/node_modules/
 frontend/dist/
 iot/include/secrets.h
 .env
+frontend/undefined/
+*.tsbuildinfo
