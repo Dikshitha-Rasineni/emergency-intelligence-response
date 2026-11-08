@@ -1,0 +1,23 @@
+# docker compose up --build        -> http://localhost:8000
+# docker compose --profile ollama up --build   (also runs a local Ollama server)
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    environment: { POSTGRES_USER: postgres, POSTGRES_PASSWORD: postgres, POSTGRES_DB: resq_ai }
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck: { test: ["CMD-SHELL", "pg_isready -U postgres"], interval: 5s, retries: 10 }
+  api:
+    build: .
+    env_file: backend/.env
+    environment:
+      DATABASE_URL: postgresql+psycopg://postgres:postgres@db:5432/resq_ai
+      OLLAMA_BASE_URL: http://ollama:11434
+    ports: ["8000:8000"]
+    volumes: [uploads:/app/backend/uploads]
+    depends_on: { db: { condition: service_healthy } }
+  ollama:
+    profiles: ["ollama"]
+    image: ollama/ollama:latest
+    volumes: [ollama:/root/.ollama]
+    ports: ["11434:11434"]
+volumes: { pgdata: {}, uploads: {}, ollama: {} }
