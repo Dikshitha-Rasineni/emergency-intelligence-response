@@ -20,3 +20,19 @@ With local models: `docker compose --profile ollama up -d`, then `docker compose
 - Self-host OSRM with an India extract instead of the public demo server.
 - One API worker unless rate limiting/WebSockets are moved to Redis.
 - Monitoring: `GET /api/v1/health` (database, PostGIS, AI provider reachability); logs include request ID and latency.
+
+## Free cloud demo: Vercel (frontend) + Render (API) + Neon (database)
+
+Vercel serves the React site and forwards `/api/*` to the API (`frontend/vercel.json`), so the browser sees one origin.
+WebSockets can't be forwarded by Vercel, so the control room connects to the API directly using `VITE_BACKEND_URL`.
+
+1. **Database (Neon):** create a project at neon.tech (region Singapore). Copy the connection string and change
+   `postgresql://` to `postgresql+psycopg://` (keep `?sslmode=require`). PostGIS is enabled by the first migration.
+2. **API (Render):** New -> Blueprint -> this repo (uses `render.yaml`). Fill in `DATABASE_URL`, `GEMINI_API_KEY`
+   (aistudio.google.com) and `CORS_ORIGINS` (your Vercel URL). Note the service URL, e.g. `https://resq-ai-api.onrender.com`.
+   Seed demo data once from the Render Shell: `python -m app.db.seed_demo_data --sample-reports`.
+3. **Frontend (Vercel):** Add New -> Project -> this repo. Root Directory: `frontend`. Environment variable
+   `VITE_BACKEND_URL` = the Render URL. If the Render URL differs from `resq-ai-api.onrender.com`, edit it in `frontend/vercel.json`.
+
+Free-tier limits: the Render API sleeps after 15 min idle (first request takes ~1 min to wake), and uploaded photos
+are lost when it restarts. Fine for a demo or review; use a paid instance with a disk for real use.

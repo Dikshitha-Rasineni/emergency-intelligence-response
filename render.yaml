@@ -1,0 +1,29 @@
+# Render Blueprint for the RESQ.AI API (the frontend is hosted on Vercel).
+# Render dashboard -> New -> Blueprint -> pick this repo.
+services:
+  - type: web
+    name: resq-ai-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: singapore
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: DATABASE_URL          # Neon connection string, written as postgresql+psycopg://...?sslmode=require
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: IOT_DEVICE_TOKEN
+        generateValue: true
+      - key: CORS_ORIGINS          # your Vercel URL, e.g. https://resq-ai.vercel.app
+        sync: false
+      - key: LLM_PROVIDER
+        value: gemini
+      - key: VISION_PROVIDER
+        value: gemini
+      - key: STT_PROVIDER
+        value: gemini
+      - key: GEMINI_API_KEY
+        sync: false

@@ -59,7 +59,13 @@ export function uploadWithProgress(path: string, form: FormData, token: string |
   });
 }
 
+/** WebSockets can't go through Vercel's /api rewrite, so in production they connect straight to the backend
+ *  (VITE_BACKEND_URL, e.g. https://resq-ai-api.onrender.com). Locally this falls back to the current host. */
+const BACKEND = (import.meta.env.VITE_BACKEND_URL as string | undefined)?.replace(/\/$/, "");
+
 export function wsUrl(path: string, token: string) {
-  const proto = location.protocol === "https:" ? "wss" : "ws";
-  return `${proto}://${location.host}${API}${path}?token=${encodeURIComponent(token)}`;
+  const base = BACKEND
+    ? BACKEND.replace(/^http/, "ws")
+    : `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}`;
+  return `${base}${API}${path}?token=${encodeURIComponent(token)}`;
 }
